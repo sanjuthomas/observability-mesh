@@ -97,7 +97,7 @@ Grafana at http://localhost:3000 is pre-provisioned with Prometheus and Tempo da
 
 ### OpenSLO → Sloth → Prometheus
 
-`slo-provisioner-service` is a Spring Boot batch worker (poll every 60s) that keeps Prometheus recording rules in sync with active OpenSLO documents in MongoDB:
+`slo-provisioner-service` is a Spring Boot batch worker (poll every 60s) that keeps Prometheus recording rules in sync with active OpenSLO documents in MongoDB. Each tenant runs its own provisioner and Prometheus; the **rules volume** is local to that tenant and mounted by both services so Sloth output lands where Prometheus loads it — not shared across application teams.
 
 ```mermaid
 flowchart LR
@@ -117,7 +117,7 @@ flowchart LR
         direction TB        
         Grafana[Grafana + Sloth dashboard 14348]
         Prom[Prometheus]
-        Rules[(shared rules volume)]
+        Rules[(tenant rules volume)]
     end
 
     SloAuth --> Mongo
@@ -131,7 +131,7 @@ flowchart LR
 
 1. Read active `kind=SLO` documents from `service-level-objectives`; resolve `spec.indicatorRef` to the active `kind=SLI` document.
 2. Compile OpenSLO v1 + SLI `ratioMetric` queries into OpenSLO v1alpha YAML for Sloth (inlines PromQL, maps `30d` windows, normalizes `[5m]` → `[{{.window}}]`).
-3. Run `sloth generate` and write `{sloName}.yml` under the shared rules directory; archive removed SLOs to `_archive/` (orphan policy: drop rules, mark `ARCHIVED` in `slo-provision-state` — Grafana objects are not deleted).
+3. Run `sloth generate` and write `{sloName}.yml` under the tenant's Prometheus rules directory; archive removed SLOs to `_archive/` (orphan policy: drop rules, mark `ARCHIVED` in `slo-provision-state` — Grafana objects are not deleted).
 4. `POST` Prometheus `/-/reload` when rules change.
 
 Datasource allowlist is configured in `application.properties` (`observability-mesh.slo-provisioner.datasource-names=payment-prometheus`). Emit matching metrics from the demo workload to evaluate SLOs in Grafana.
