@@ -100,7 +100,7 @@ class SlothCliRunnerTest {
 
     private static SloProvisionerProperties properties(String slothBinary) {
         return new SloProvisionerProperties(
-                60_000, "service-level-objectives", "slo-provision-state",
+                60_000, "service_level_objectives", "slo_provision_state",
                 "/rules", "_archive", "", slothBinary, "/work", "payment-prometheus");
     }
 }

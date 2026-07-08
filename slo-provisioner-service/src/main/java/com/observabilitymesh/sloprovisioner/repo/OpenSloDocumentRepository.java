@@ -1,56 +1,78 @@
 package com.observabilitymesh.sloprovisioner.repo;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.observabilitymesh.sloprovisioner.config.SloProvisionerProperties;
 import com.observabilitymesh.sloprovisioner.model.OpenSloDocumentView;
-import org.bson.Document;
-import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.data.mongodb.core.query.Criteria;
-import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
-import java.util.ArrayList;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Repository
 public class OpenSloDocumentRepository {
 
-    private final MongoTemplate mongoTemplate;
-    private final String collection;
+    private final JdbcTemplate jdbcTemplate;
+    private final String table;
+    private final RowMapper<OpenSloDocumentView> rowMapper;
 
-    public OpenSloDocumentRepository(MongoTemplate sloProvisionerMongoTemplate, SloProvisionerProperties properties) {
-        this.mongoTemplate = sloProvisionerMongoTemplate;
-        this.collection = properties.opensloCollection();
+    public OpenSloDocumentRepository(
+            JdbcTemplate jdbcTemplate, SloProvisionerProperties properties, ObjectMapper objectMapper) {
+        this.jdbcTemplate = jdbcTemplate;
+        this.table = SqlIdentifiers.requireTableName(properties.opensloTable());
+        this.rowMapper = (rs, rowNum) -> mapRow(rs, objectMapper);
     }
 
     public List<OpenSloDocumentView> listActiveByKind(String kind) {
-        Query query = new Query(Criteria.where("stale").is(false).and("kind").is(kind));
-        List<OpenSloDocumentView> documents = new ArrayList<>();
-        for (Document document : mongoTemplate.find(query, Document.class, collection)) {
-            documents.add(toView(document));
-        }
-        return documents;
+        String sql = """
+                SELECT id::text, logical_key, version, stale, kind, name, content
+                FROM %s
+                WHERE stale = false AND kind = ?
+                """.formatted(table);
+        return jdbcTemplate.query(sql, rowMapper, kind);
     }
 
     public Optional<OpenSloDocumentView> findActiveByKindAndName(String kind, String name) {
-        Query query = new Query(Criteria.where("stale").is(false).and("kind").is(kind).and("name").is(name));
-        Document document = mongoTemplate.findOne(query, Document.class, collection);
-        return document == null ? Optional.empty() : Optional.of(toView(document));
+        String sql = """
+                SELECT id::text, logical_key, version, stale, kind, name, content
+                FROM %s
+                WHERE stale = false AND kind = ? AND name = ?
+                LIMIT 1
+                """.formatted(table);
+        List<OpenSloDocumentView> rows = jdbcTemplate.query(sql, rowMapper, kind, name);
+        return rows.isEmpty() ? Optional.empty() : Optional.of(rows.getFirst());
     }
 
     public List<String> listActiveSloLogicalKeys() {
         return listActiveByKind("SLO").stream().map(OpenSloDocumentView::logicalKey).toList();
     }
 
-    @SuppressWarnings("unchecked")
-    private static OpenSloDocumentView toView(Document document) {
+    private static OpenSloDocumentView mapRow(ResultSet rs, ObjectMapper objectMapper) throws SQLException {
+        Map<String, Object> content = readContent(rs, objectMapper);
         return new OpenSloDocumentView(
-                document.getString("_id"),
-                document.getString("logicalKey"),
-                document.getInteger("version"),
-                Boolean.TRUE.equals(document.getBoolean("stale")),
-                document.getString("kind"),
-                document.getString("name"),
-                (java.util.Map<String, Object>) document.get("content"));
+                rs.getString("id"),
+                rs.getString("logical_key"),
+                rs.getInt("version"),
+                rs.getBoolean("stale"),
+                rs.getString("kind"),
+                rs.getString("name"),
+                content);
+    }
+
+    private static Map<String, Object> readContent(ResultSet rs, ObjectMapper objectMapper) throws SQLException {
+        String json = rs.getString("content");
+        if (json == null) {
+            return Map.of();
+        }
+        try {
+            return objectMapper.readValue(json, new TypeReference<>() {});
+        } catch (Exception e) {
+            throw new SQLException("Failed to parse OpenSLO content JSON", e);
+        }
     }
 }

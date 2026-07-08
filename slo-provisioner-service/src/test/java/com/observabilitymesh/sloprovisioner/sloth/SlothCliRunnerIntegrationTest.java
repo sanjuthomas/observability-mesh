@@ -47,7 +47,7 @@ class SlothCliRunnerIntegrationTest {
         Files.writeString(input, openSlo);
 
         SlothCliRunner runner = new SlothCliRunner(new com.observabilitymesh.sloprovisioner.config.SloProvisionerProperties(
-                60_000, "service-level-objectives", "slo-provision-state",
+                60_000, "service_level_objectives", "slo_provision_state",
                 tempDir.toString(), "_archive", "", slothBinary(), tempDir.toString(), "payment-prometheus"));
         runner.generate(input, output);
 

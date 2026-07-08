@@ -9,8 +9,8 @@ import java.util.stream.Collectors;
 @ConfigurationProperties(prefix = "observability-mesh.slo-provisioner")
 public record SloProvisionerProperties(
         long pollIntervalMs,
-        String opensloCollection,
-        String provisionStateCollection,
+        String opensloTable,
+        String provisionStateTable,
         String prometheusRulesDir,
         String archiveSubdir,
         String prometheusReloadUrl,

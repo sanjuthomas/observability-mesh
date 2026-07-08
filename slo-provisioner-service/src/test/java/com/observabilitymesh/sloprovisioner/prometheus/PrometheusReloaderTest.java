@@ -64,7 +64,7 @@ class PrometheusReloaderTest {
 
     private static SloProvisionerProperties properties(String reloadUrl) {
         return new SloProvisionerProperties(
-                60_000, "service-level-objectives", "slo-provision-state",
+                60_000, "service_level_objectives", "slo_provision_state",
                 "/rules", "_archive", reloadUrl, "sloth", "/work", "payment-prometheus");
     }
 }

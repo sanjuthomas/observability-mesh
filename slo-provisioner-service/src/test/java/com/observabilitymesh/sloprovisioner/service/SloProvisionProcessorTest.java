@@ -48,8 +48,8 @@ class SloProvisionProcessorTest {
     void setUp() throws Exception {
         SloProvisionerProperties properties = new SloProvisionerProperties(
                 60_000,
-                "service-level-objectives",
-                "slo-provision-state",
+                "service_level_objectives",
+                "slo_provision_state",
                 tempDir.resolve("rules").toString(),
                 "_archive",
                 "http://prometheus:9090/-/reload",

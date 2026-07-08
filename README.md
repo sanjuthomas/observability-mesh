@@ -14,7 +14,13 @@ At the other end of the spectrum, a small company wants reliable operations with
 
 This repo is my answer: a **service reliability catalog** assembled from open-source and free tools, wired together so you can run a small application with a full observability stack — the same way data mesh thinking lets teams own their data products without waiting on a central warehouse team. Call it an **observability mesh**: each service exports OTLP, the catalog provides the shared backends (Prometheus, Tempo, Grafana, OpenSearch), and OpenSLO gives you a portable way to define what “good” looks like before you outgrow the setup.
 
-The Java microservices here are a **demo workload** to prove the catalog works end-to-end. You can swap them for your own services and keep the mesh.
+The Java microservices here are a **demo workload** to prove the catalog works end-to-end. You can swap them for your own services and keep the mesh. The demo app uses MongoDB; the **SLO catalog** (`slo-author-service` + `slo-provisioner-service`) uses **PostgreSQL** so the mesh path stays on fully OSI-open-source storage.
+
+## Who this is for
+
+**Enterprise observability leaders** exploring a federated model — platform teams publish composable building blocks; application teams own isolated tenants (storage, cardinality, SLIs). This repo is a reference composition and architecture practice, not a turnkey enterprise product yet.
+
+**Startups and builders** who want a full open-source observability stack with a working demo — clone, run `docker compose up`, and replace the demo services with your own while keeping the mesh.
 
 ## Architecture
 
@@ -97,14 +103,14 @@ Grafana at http://localhost:3000 is pre-provisioned with Prometheus and Tempo da
 
 ### OpenSLO → Sloth → Prometheus
 
-`slo-provisioner-service` is a Spring Boot batch worker (poll every 60s) that keeps Prometheus recording rules in sync with active OpenSLO documents in MongoDB. Each tenant runs its own provisioner and Prometheus; the **rules volume** is local to that tenant and mounted by both services so Sloth output lands where Prometheus loads it — not shared across application teams.
+`slo-provisioner-service` is a Spring Boot batch worker (poll every 60s) that keeps Prometheus recording rules in sync with active OpenSLO documents in **PostgreSQL** (`open_slo` database, `service_level_objectives` table). Each tenant runs its own provisioner and Prometheus; the **rules volume** is local to that tenant and mounted by both services so Sloth output lands where Prometheus loads it — not shared across application teams.
 
 ```mermaid
 flowchart LR
     subgraph Authoring[Authoring]
         direction TB
         SloAuth[SLO authoring service]
-        Mongo[(MongoDB open-slo)]
+        Postgres[(PostgreSQL open_slo)]
     end
 
     subgraph Provisioning[Provisioning]
@@ -120,8 +126,8 @@ flowchart LR
         Rules[(tenant rules volume)]
     end
 
-    SloAuth --> Mongo
-    Mongo -->|poll stale=false SLO + SLI| Prov
+    SloAuth --> Postgres
+    Postgres -->|poll stale=false SLO + SLI| Prov
     Prov -->|OpenSLO v1 → v1alpha YAML| Sloth
     Sloth -->|Prometheus rules .yml| Rules
     Rules --> Prom
@@ -129,16 +135,16 @@ flowchart LR
     Prom --> Grafana
 ```
 
-1. Read active `kind=SLO` documents from `service-level-objectives`; resolve `spec.indicatorRef` to the active `kind=SLI` document.
+1. Read active `kind=SLO` rows from `service_level_objectives`; resolve `spec.indicatorRef` to the active `kind=SLI` document.
 2. Compile OpenSLO v1 + SLI `ratioMetric` queries into OpenSLO v1alpha YAML for Sloth (inlines PromQL, maps `30d` windows, normalizes `[5m]` → `[{{.window}}]`).
-3. Run `sloth generate` and write `{sloName}.yml` under the tenant's Prometheus rules directory; archive removed SLOs to `_archive/` (orphan policy: drop rules, mark `ARCHIVED` in `slo-provision-state` — Grafana objects are not deleted).
+3. Run `sloth generate` and write `{sloName}.yml` under the tenant's Prometheus rules directory; archive removed SLOs to `_archive/` (orphan policy: drop rules, mark `ARCHIVED` in `slo_provision_state` — Grafana objects are not deleted).
 4. `POST` Prometheus `/-/reload` when rules change.
 
 Datasource allowlist is configured in `application.properties` (`observability-mesh.slo-provisioner.datasource-names=payment-prometheus`). Emit matching metrics from the demo workload to evaluate SLOs in Grafana.
 
 ### OpenSLO authoring
 
-`slo-author-service` (port 9090) is where developers author, validate, and version OpenSLO v1 documents through a browser UI and REST API. Documents are validated with the [open-slo-java-sdk](https://github.com/sanjuthomas/open-slo-java-sdk) and stored in MongoDB (`open-slo` database, `service-level-objectives` collection) on the same MongoDB instance as the application services. It authenticates against Keycloak (OIDC) like the other services — sign in at http://localhost:9090/ui/ with demo credentials **`admin-001`** / **`Password1!`** (any user from [keycloak-seed/users.yaml](keycloak-seed/users.yaml) works); the `/api/v1/documents/**` API is JWT-protected. `slo-provisioner-service` then reads those active SLOs and translates them into Prometheus rules via Sloth.
+`slo-author-service` (port 9090) is where developers author, validate, and version OpenSLO v1 documents through a browser UI and REST API. Documents are validated with the [open-slo-java-sdk](https://github.com/sanjuthomas/open-slo-java-sdk) and stored in **PostgreSQL** (`open_slo` database, `service_level_objectives` table with JSONB `content`). It authenticates against Keycloak (OIDC) like the other services — sign in at http://localhost:9090/ui/ with demo credentials **`admin-001`** / **`Password1!`** (any user from [keycloak-seed/users.yaml](keycloak-seed/users.yaml) works); the `/api/v1/documents/**` API is JWT-protected. `slo-provisioner-service` then reads those active SLOs and translates them into Prometheus rules via Sloth.
 
 ## Sanction scanning (OFAC)
 
@@ -172,7 +178,8 @@ The simulated delay intentionally generates latency data for future **sanction s
 | Build | Maven Wrapper (`./mvnw`) |
 | Identity | Keycloak (OIDC) |
 | Policy | OPA (Rego) |
-| Data | MongoDB replica set |
+| Demo app data | MongoDB replica set |
+| SLO catalog | PostgreSQL (`open_slo`) |
 | SLO authoring | `slo-author-service` (OpenSLO v1 + [open-slo-java-sdk](https://github.com/sanjuthomas/open-slo-java-sdk)) |
 | SLO provisioning | [Sloth](https://github.com/slok/sloth) → Prometheus recording rules |
 | Observability | OTel Collector, Prometheus, Tempo, Grafana, OpenSearch, OpenSearch Dashboards |
@@ -213,7 +220,7 @@ docker compose up -d --build
 
 Default demo password: `Password1!` (see [keycloak-seed/users.yaml](keycloak-seed/users.yaml)).
 
-If another Docker stack already uses names like `mongodb` or `opensearch`, stop it first or Compose will fail with a container name conflict.
+If another Docker stack already uses names like `mongodb`, `postgres`, or `opensearch`, stop it first or Compose will fail with a container name conflict.
 
 ## Service URLs
 
@@ -243,9 +250,9 @@ If another Docker stack already uses names like `mongodb` or `opensearch`, stop 
 Run backing infrastructure and peer services:
 
 ```bash
-docker compose up -d mongodb mongo-init opa opa-policy-seed keycloak keycloak-seed \
+docker compose up -d mongodb mongo-init postgres opa opa-policy-seed keycloak keycloak-seed \
   otel-collector opensearch opensearch-dashboards prometheus tempo grafana \
-  sequence-service authorization-service
+  sequence-service authorization-service slo-author-service
 ```
 
 Point a locally running service at the collector with `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317`.
@@ -265,6 +272,7 @@ Point a locally running service at the collector with `OTEL_EXPORTER_OTLP_ENDPOI
 ├── demo-harness/
 ├── keycloak-seed/
 ├── opa-policy-seed/
+├── postgres/                # PostgreSQL init for SLO catalog (open_slo)
 ├── prometheus/              # Prometheus scrape config (otel-collector metrics)
 ├── tempo/                   # Tempo trace storage config
 ├── grafana/                 # Grafana datasource provisioning

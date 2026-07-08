@@ -4,7 +4,7 @@ Guidance for AI coding agents working in **Observability Mesh** (`observability-
 
 ## Project summary
 
-**Observability Mesh** — Java monorepo with a demo workload (policy-aware SSI cash instruction and payment lifecycle, trimmed port of [policy-pilot](https://github.com/sanjuthomas/policy-pilot)) and a composable observability stack: **MongoDB only** (no Kafka, Neo4j, or chat), per-service browser UIs, demo harness, **Keycloak OIDC**, **OPA**, **SLO author service (OpenSLO authoring)**, **SLO provisioner (Sloth)**, **otel-collector**, **Prometheus**, **Tempo**, **Grafana**, and **OpenSearch**.
+**Observability Mesh** — Java monorepo with a demo workload (policy-aware SSI cash instruction and payment lifecycle, trimmed port of [policy-pilot](https://github.com/sanjuthomas/policy-pilot)) and a composable observability stack: demo app on **MongoDB**, **SLO catalog on PostgreSQL** (no Kafka, Neo4j, or chat), per-service browser UIs, demo harness, **Keycloak OIDC**, **OPA**, **SLO author service (OpenSLO authoring)**, **SLO provisioner (Sloth)**, **otel-collector**, **Prometheus**, **Tempo**, **Grafana**, and **OpenSearch**.
 
 Stack: Java **21**, Maven Wrapper (`./mvnw`), JaCoCo (**80% minimum overall coverage** per module).
 
@@ -39,7 +39,7 @@ Agents **must**:
 
 - Package root: `com.observabilitymesh`
 - DTOs: Java `record`s with Jakarta validation
-- Persistence: Spring Data MongoDB + bitemporal `in`/`out` versioning
+- Persistence: demo services — Spring Data MongoDB + bitemporal `in`/`out` versioning; SLO catalog — Spring Data JPA / JDBC on PostgreSQL (`open_slo`, JSONB `content`)
 - Errors: `ResponseStatusException` + `@ControllerAdvice` → JSON `ApiError`
 - Auth: Keycloak JWT + OBO headers (`X-On-Behalf-Of`)
 

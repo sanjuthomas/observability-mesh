@@ -1,39 +1,59 @@
 package com.observabilitymesh.sloauthor.model;
 
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.index.CompoundIndex;
-import org.springframework.data.mongodb.core.index.CompoundIndexes;
-import org.springframework.data.mongodb.core.mapping.Document;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.util.Map;
 
-@Document(collection = "service-level-objectives")
-@CompoundIndexes({
-    @CompoundIndex(name = "logical_key_version", def = "{'logicalKey': 1, 'version': -1}"),
-    @CompoundIndex(name = "logical_key_stale", def = "{'logicalKey': 1, 'stale': 1}")
-})
+@Entity
+@Table(
+        name = "service_level_objectives",
+        uniqueConstraints = @UniqueConstraint(name = "uk_slo_logical_key_version", columnNames = {"logical_key", "version"}),
+        indexes = {
+            @Index(name = "idx_slo_logical_key_stale", columnList = "logical_key, stale")
+        })
 public class OpenSloDocument {
 
     @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(columnDefinition = "uuid")
     private String id;
 
+    @Column(name = "logical_key", nullable = false)
     private String logicalKey;
 
+    @Column(nullable = false)
     private int version;
 
+    @Column(nullable = false)
     private boolean stale;
 
+    @Column(name = "api_version", nullable = false)
     private String apiVersion;
 
+    @Column(nullable = false)
     private String kind;
 
+    @Column(nullable = false)
     private String name;
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb", nullable = false)
     private Map<String, Object> content;
 
+    @Column(name = "created_by", nullable = false)
     private String createdBy;
 
+    @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
     public String getId() {

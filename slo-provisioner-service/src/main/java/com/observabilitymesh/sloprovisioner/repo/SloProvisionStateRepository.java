@@ -3,61 +3,80 @@ package com.observabilitymesh.sloprovisioner.repo;
 import com.observabilitymesh.sloprovisioner.config.SloProvisionerProperties;
 import com.observabilitymesh.sloprovisioner.model.ProvisionStatus;
 import com.observabilitymesh.sloprovisioner.model.SloProvisionState;
-import org.bson.Document;
-import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.data.mongodb.core.query.Criteria;
-import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 
 @Repository
 public class SloProvisionStateRepository {
 
-    private final MongoTemplate mongoTemplate;
-    private final String collection;
+    private final JdbcTemplate jdbcTemplate;
+    private final String table;
+    private final RowMapper<SloProvisionState> rowMapper = SloProvisionStateRepository::mapRow;
 
-    public SloProvisionStateRepository(MongoTemplate sloProvisionerMongoTemplate, SloProvisionerProperties properties) {
-        this.mongoTemplate = sloProvisionerMongoTemplate;
-        this.collection = properties.provisionStateCollection();
+    public SloProvisionStateRepository(JdbcTemplate jdbcTemplate, SloProvisionerProperties properties) {
+        this.jdbcTemplate = jdbcTemplate;
+        this.table = SqlIdentifiers.requireTableName(properties.provisionStateTable());
     }
 
     public SloProvisionState findByLogicalKey(String logicalKey) {
-        Document document = mongoTemplate.findById(logicalKey, Document.class, collection);
-        return document == null ? null : toState(document);
+        String sql = """
+                SELECT logical_key, openslo_version, status, rules_file_name, content_hash, last_synced_at, last_error
+                FROM %s
+                WHERE logical_key = ?
+                """.formatted(table);
+        List<SloProvisionState> rows = jdbcTemplate.query(sql, rowMapper, logicalKey);
+        return rows.isEmpty() ? null : rows.getFirst();
     }
 
     public List<SloProvisionState> listByStatus(ProvisionStatus status) {
-        Query query = new Query(Criteria.where("status").is(status.name()));
-        List<SloProvisionState> states = new ArrayList<>();
-        for (Document document : mongoTemplate.find(query, Document.class, collection)) {
-            states.add(toState(document));
-        }
-        return states;
+        String sql = """
+                SELECT logical_key, openslo_version, status, rules_file_name, content_hash, last_synced_at, last_error
+                FROM %s
+                WHERE status = ?
+                """.formatted(table);
+        return jdbcTemplate.query(sql, rowMapper, status.name());
     }
 
     public void upsert(SloProvisionState state) {
-        Document document = new Document("_id", state.logicalKey())
-                .append("logicalKey", state.logicalKey())
-                .append("opensloVersion", state.opensloVersion())
-                .append("status", state.status().name())
-                .append("rulesFileName", state.rulesFileName())
-                .append("contentHash", state.contentHash())
-                .append("lastSyncedAt", state.lastSyncedAt().toString())
-                .append("lastError", state.lastError());
-        mongoTemplate.save(document, collection);
+        String sql = """
+                INSERT INTO %s (logical_key, openslo_version, status, rules_file_name, content_hash, last_synced_at, last_error)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (logical_key) DO UPDATE SET
+                  openslo_version = EXCLUDED.openslo_version,
+                  status = EXCLUDED.status,
+                  rules_file_name = EXCLUDED.rules_file_name,
+                  content_hash = EXCLUDED.content_hash,
+                  last_synced_at = EXCLUDED.last_synced_at,
+                  last_error = EXCLUDED.last_error
+                """.formatted(table);
+        jdbcTemplate.update(
+                sql,
+                state.logicalKey(),
+                state.opensloVersion(),
+                state.status().name(),
+                state.rulesFileName(),
+                state.contentHash(),
+                Timestamp.from(state.lastSyncedAt()),
+                state.lastError());
     }
 
-    private static SloProvisionState toState(Document document) {
+    private static SloProvisionState mapRow(ResultSet rs, int rowNum) throws SQLException {
+        Timestamp syncedAt = rs.getTimestamp("last_synced_at");
+        Instant lastSyncedAt = syncedAt != null ? syncedAt.toInstant() : Instant.EPOCH;
         return new SloProvisionState(
-                document.getString("logicalKey"),
-                document.getInteger("opensloVersion"),
-                ProvisionStatus.valueOf(document.getString("status")),
-                document.getString("rulesFileName"),
-                document.getString("contentHash"),
-                Instant.parse(document.getString("lastSyncedAt")),
-                document.getString("lastError"));
+                rs.getString("logical_key"),
+                rs.getInt("openslo_version"),
+                ProvisionStatus.valueOf(rs.getString("status")),
+                rs.getString("rules_file_name"),
+                rs.getString("content_hash"),
+                lastSyncedAt,
+                rs.getString("last_error"));
     }
 }

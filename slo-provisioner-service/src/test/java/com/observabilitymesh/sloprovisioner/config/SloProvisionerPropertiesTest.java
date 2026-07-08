@@ -9,7 +9,7 @@ class SloProvisionerPropertiesTest {
     @Test
     void datasourceNameSetTrimsSingleValue() {
         SloProvisionerProperties properties = new SloProvisionerProperties(
-                60_000, "service-level-objectives", "slo-provision-state",
+                60_000, "service_level_objectives", "slo_provision_state",
                 "/rules", "_archive", "", "sloth", "/work", "payment-prometheus");
         assertThat(properties.datasourceNameSet()).containsExactly("payment-prometheus");
     }
@@ -17,7 +17,7 @@ class SloProvisionerPropertiesTest {
     @Test
     void datasourceNameSetSplitsCsv() {
         SloProvisionerProperties properties = new SloProvisionerProperties(
-                60_000, "service-level-objectives", "slo-provision-state",
+                60_000, "service_level_objectives", "slo_provision_state",
                 "/rules", "_archive", "", "sloth", "/work", " payment-prometheus , other ");
         assertThat(properties.datasourceNameSet()).containsExactlyInAnyOrder("payment-prometheus", "other");
     }
@@ -25,7 +25,7 @@ class SloProvisionerPropertiesTest {
     @Test
     void datasourceNameSetEmptyWhenBlank() {
         SloProvisionerProperties properties = new SloProvisionerProperties(
-                60_000, "service-level-objectives", "slo-provision-state",
+                60_000, "service_level_objectives", "slo_provision_state",
                 "/rules", "_archive", "", "sloth", "/work", "  ");
         assertThat(properties.datasourceNameSet()).isEmpty();
     }

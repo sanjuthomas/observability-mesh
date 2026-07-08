@@ -3,16 +3,15 @@ package com.observabilitymesh.sloprovisioner.repo;
 import com.observabilitymesh.sloprovisioner.config.SloProvisionerProperties;
 import com.observabilitymesh.sloprovisioner.model.ProvisionStatus;
 import com.observabilitymesh.sloprovisioner.model.SloProvisionState;
-import org.bson.Document;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
 
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 
@@ -25,54 +24,44 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class SloProvisionStateRepositoryTest {
 
-    @Mock MongoTemplate mongoTemplate;
+    @Mock JdbcTemplate jdbcTemplate;
 
     private SloProvisionStateRepository repository;
 
     @BeforeEach
     void setUp() {
         SloProvisionerProperties properties = new SloProvisionerProperties(
-                60_000, "service-level-objectives", "slo-provision-state",
+                60_000, "service_level_objectives", "slo_provision_state",
                 "/rules", "_archive", "", "sloth", "/work", "payment-prometheus");
-        repository = new SloProvisionStateRepository(mongoTemplate, properties);
+        repository = new SloProvisionStateRepository(jdbcTemplate, properties);
     }
 
     @Test
     void findByLogicalKeyReturnsNullWhenMissing() {
-        when(mongoTemplate.findById("missing", Document.class, "slo-provision-state")).thenReturn(null);
+        when(jdbcTemplate.query(any(String.class), any(RowMapper.class), eq("missing")))
+                .thenReturn(List.of());
         assertThat(repository.findByLogicalKey("missing")).isNull();
     }
 
     @Test
     void findByLogicalKeyReturnsState() {
-        Document document = new Document("_id", "key")
-                .append("logicalKey", "key")
-                .append("opensloVersion", 2)
-                .append("status", "ACTIVE")
-                .append("rulesFileName", "demo.yml")
-                .append("contentHash", "abc")
-                .append("lastSyncedAt", Instant.parse("2026-01-01T00:00:00Z").toString())
-                .append("lastError", null);
-        when(mongoTemplate.findById("key", Document.class, "slo-provision-state")).thenReturn(document);
+        SloProvisionState state = new SloProvisionState(
+                "key", 2, ProvisionStatus.ACTIVE, "demo.yml", "abc", Instant.parse("2026-01-01T00:00:00Z"), null);
+        when(jdbcTemplate.query(any(String.class), any(RowMapper.class), eq("key")))
+                .thenReturn(List.of(state));
 
-        SloProvisionState state = repository.findByLogicalKey("key");
+        SloProvisionState found = repository.findByLogicalKey("key");
 
-        assertThat(state.status()).isEqualTo(ProvisionStatus.ACTIVE);
-        assertThat(state.opensloVersion()).isEqualTo(2);
+        assertThat(found.status()).isEqualTo(ProvisionStatus.ACTIVE);
+        assertThat(found.opensloVersion()).isEqualTo(2);
     }
 
     @Test
     void listByStatusMapsDocuments() {
-        Document document = new Document("_id", "key")
-                .append("logicalKey", "key")
-                .append("opensloVersion", 1)
-                .append("status", "ARCHIVED")
-                .append("rulesFileName", "demo.yml")
-                .append("contentHash", "abc")
-                .append("lastSyncedAt", Instant.now().toString())
-                .append("lastError", "gone");
-        when(mongoTemplate.find(any(Query.class), eq(Document.class), eq("slo-provision-state")))
-                .thenReturn(List.of(document));
+        SloProvisionState state = new SloProvisionState(
+                "key", 1, ProvisionStatus.ARCHIVED, "demo.yml", "abc", Instant.now(), "gone");
+        when(jdbcTemplate.query(any(String.class), any(RowMapper.class), eq("ARCHIVED")))
+                .thenReturn(List.of(state));
 
         List<SloProvisionState> states = repository.listByStatus(ProvisionStatus.ARCHIVED);
 
@@ -81,14 +70,21 @@ class SloProvisionStateRepositoryTest {
     }
 
     @Test
-    void upsertPersistsDocument() {
+    void upsertPersistsRow() {
+        Instant syncedAt = Instant.parse("2026-01-01T00:00:00Z");
         SloProvisionState state = new SloProvisionState(
-                "key", 1, ProvisionStatus.ACTIVE, "demo.yml", "hash", Instant.now(), null);
+                "key", 1, ProvisionStatus.ACTIVE, "demo.yml", "hash", syncedAt, null);
 
         repository.upsert(state);
 
-        ArgumentCaptor<Document> captor = ArgumentCaptor.forClass(Document.class);
-        verify(mongoTemplate).save(captor.capture(), eq("slo-provision-state"));
-        assertThat(captor.getValue().getString("status")).isEqualTo("ACTIVE");
+        verify(jdbcTemplate).update(
+                any(String.class),
+                eq("key"),
+                eq(1),
+                eq("ACTIVE"),
+                eq("demo.yml"),
+                eq("hash"),
+                eq(Timestamp.from(syncedAt)),
+                eq(null));
     }
 }

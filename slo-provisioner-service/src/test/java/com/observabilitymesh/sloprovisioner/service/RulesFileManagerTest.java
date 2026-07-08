@@ -21,8 +21,8 @@ class RulesFileManagerTest {
     void setUp() throws Exception {
         SloProvisionerProperties properties = new SloProvisionerProperties(
                 60_000,
-                "service-level-objectives",
-                "slo-provision-state",
+                "service_level_objectives",
+                "slo_provision_state",
                 tempDir.toString(),
                 "_archive",
                 "",

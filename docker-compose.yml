@@ -226,15 +226,28 @@ services:
         until mongosh --host mongodb:27017 --quiet --eval 'rs.isMaster().ismaster' | grep -q true; do
           sleep 1
         done
-        mongosh --host mongodb:27017 --quiet --eval '
-          const sloDb = db.getSiblingDB("open-slo");
-          if (!sloDb.getCollectionNames().includes("service-level-objectives")) {
-            sloDb.createCollection("service-level-objectives");
-          }
-          if (!sloDb.getCollectionNames().includes("slo-provision-state")) {
-            sloDb.createCollection("slo-provision-state");
-          }
-        '
+    networks:
+      - observability-mesh-net
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres
+    environment:
+      POSTGRES_DB: open_slo
+      POSTGRES_USER: open_slo
+      POSTGRES_PASSWORD: open_slo
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U open_slo -d open_slo"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
     networks:
       - observability-mesh-net
 
@@ -430,13 +443,12 @@ services:
     environment:
       <<: [*otel-environment, *keycloak-environment]
       OTEL_SERVICE_NAME: slo-author-service
-      MONGODB_URI: mongodb://mongodb:27017/?replicaSet=rs0
-      MONGODB_DATABASE: open-slo
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/open_slo
+      SPRING_DATASOURCE_USERNAME: open_slo
+      SPRING_DATASOURCE_PASSWORD: open_slo
     depends_on:
-      mongodb:
+      postgres:
         condition: service_healthy
-      mongo-init:
-        condition: service_completed_successfully
       keycloak-seed:
         condition: service_completed_successfully
     restart: unless-stopped
@@ -453,8 +465,9 @@ services:
     environment:
       <<: *otel-environment
       OTEL_SERVICE_NAME: slo-provisioner-service
-      MONGODB_URI: mongodb://mongodb:27017/?replicaSet=rs0
-      MONGODB_DATABASE: open-slo
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/open_slo
+      SPRING_DATASOURCE_USERNAME: open_slo
+      SPRING_DATASOURCE_PASSWORD: open_slo
       PROMETHEUS_RULES_DIR: /rules
       PROMETHEUS_RELOAD_URL: http://prometheus:9090/-/reload
       SLO_PROVISIONER_WORK_DIR: /work
@@ -462,10 +475,8 @@ services:
     volumes:
       - prometheus-sloth-rules:/rules
     depends_on:
-      mongodb:
+      postgres:
         condition: service_healthy
-      mongo-init:
-        condition: service_completed_successfully
       slo-author-service:
         condition: service_started
       prometheus:
@@ -506,6 +517,7 @@ networks:
 
 volumes:
   mongo-data:
+  postgres-data:
   opensearch-data:
   prometheus-data:
   prometheus-sloth-rules:
