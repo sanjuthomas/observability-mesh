@@ -1,24 +1,22 @@
 package com.observabilitymesh.authz.web.dto;
 
-import com.fasterxml.jackson.databind.PropertyNamingStrategies;
-import com.fasterxml.jackson.databind.annotation.JsonNaming;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.List;
 
-@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 public record UserDirectoryRow(
-        String userId,
-        String loginName,
-        String givenName,
-        String familyName,
-        String displayName,
+        @JsonProperty("user_id") String userId,
+        @JsonProperty("login_name") String loginName,
+        @JsonProperty("given_name") String givenName,
+        @JsonProperty("family_name") String familyName,
+        @JsonProperty("display_name") String displayName,
         String title,
         String lob,
         List<String> roles,
         List<String> groups,
-        List<String> amountClubs,
-        List<String> coveringLobs,
-        String supervisorId,
-        String supervisorDisplayName
+        @JsonProperty("amount_clubs") List<String> amountClubs,
+        @JsonProperty("covering_lobs") List<String> coveringLobs,
+        @JsonProperty("supervisor_id") String supervisorId,
+        @JsonProperty("supervisor_display_name") String supervisorDisplayName
 ) {
 }

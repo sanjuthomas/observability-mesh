@@ -1,17 +1,15 @@
 package com.observabilitymesh.authz.web.dto;
 
-import com.fasterxml.jackson.databind.PropertyNamingStrategies;
-import com.fasterxml.jackson.databind.annotation.JsonNaming;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.List;
 
-@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 public record GroupMemberRow(
-        String userId,
-        String displayName,
+        @JsonProperty("user_id") String userId,
+        @JsonProperty("display_name") String displayName,
         String title,
         List<String> roles,
         List<String> groups,
-        List<String> coveringLobs
+        @JsonProperty("covering_lobs") List<String> coveringLobs
 ) {
 }

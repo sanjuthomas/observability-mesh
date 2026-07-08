@@ -239,3 +239,7 @@ select {
   color: var(--muted);
   padding: 2rem;
 }
+
+.hidden {
+  display: none;
+}
