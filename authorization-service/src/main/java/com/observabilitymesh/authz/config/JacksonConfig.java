@@ -13,8 +13,8 @@ public class JacksonConfig {
 
     @Bean
     @Primary
-    ObjectMapper authzObjectMapper(ObjectMapper objectMapper) {
-        return objectMapper.copy()
+    ObjectMapper authzObjectMapper() {
+        return new ObjectMapper()
                 .registerModule(new JavaTimeModule())
                 .setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
                 .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);

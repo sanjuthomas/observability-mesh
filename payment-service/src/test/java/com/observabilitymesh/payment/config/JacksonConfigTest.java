@@ -15,7 +15,7 @@ class JacksonConfigTest {
     @Test
     void paymentObjectMapperUsesSnakeCase() {
         JacksonConfig config = new JacksonConfig();
-        ObjectMapper mapper = config.paymentObjectMapper(new ObjectMapper());
+        ObjectMapper mapper = config.paymentObjectMapper();
         Subject subject = new Subject("u1", "A", "B", "VP", "FICC", List.of("PAYMENT_CREATOR"), List.of(), null, List.of("FICC"), null, List.of());
         Payment payment = Payment.create("P-1", "I-1", 1, 10.0, "USD", "2026-07-01", "FICC", "STANDING",
                 PaymentAuthorization.userRef(subject), Payment.newEventId());

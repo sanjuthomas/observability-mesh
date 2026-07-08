@@ -1,4 +1,4 @@
-package com.observabilitymesh.harness.config;
+package com.observabilitymesh.auth;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

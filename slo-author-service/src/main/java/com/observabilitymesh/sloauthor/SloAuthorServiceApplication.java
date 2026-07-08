@@ -3,7 +3,7 @@ package com.observabilitymesh.sloauthor;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
-@SpringBootApplication(scanBasePackages = "com.observabilitymesh")
+@SpringBootApplication(scanBasePackages = {"com.observabilitymesh.sloauthor", "com.observabilitymesh.auth"})
 public class SloAuthorServiceApplication {
 
     public static void main(String[] args) {

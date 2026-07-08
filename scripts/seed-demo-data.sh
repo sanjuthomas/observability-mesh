@@ -85,7 +85,7 @@ reset_stack() {
 harness_login() {
   LOGIN_JSON="$(curl -sf -X POST "${HARNESS_URL}/api/auth/login" \
     -H 'Content-Type: application/json' \
-    -d "{\"user_id\":\"${ADMIN_USER}\",\"password\":\"${ADMIN_PASSWORD}\"}")"
+    -d "{\"userId\":\"${ADMIN_USER}\",\"password\":\"${ADMIN_PASSWORD}\"}")"
   HARNESS_TOKEN="$(printf '%s' "${LOGIN_JSON}" | python3 -c 'import sys,json; print(json.load(sys.stdin)["session_token"])')"
   HARNESS_SESSION_ID="$(printf '%s' "${LOGIN_JSON}" | python3 -c 'import sys,json; print(json.load(sys.stdin)["session_id"])')"
   export HARNESS_TOKEN HARNESS_SESSION_ID

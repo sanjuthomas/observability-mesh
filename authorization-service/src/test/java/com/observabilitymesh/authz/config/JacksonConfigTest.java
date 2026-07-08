@@ -11,7 +11,7 @@ class JacksonConfigTest {
     @Test
     void authzObjectMapperUsesSnakeCase() {
         JacksonConfig config = new JacksonConfig();
-        ObjectMapper mapper = config.authzObjectMapper(new ObjectMapper());
+        ObjectMapper mapper = config.authzObjectMapper();
         assertThat(mapper.getPropertyNamingStrategy()).isEqualTo(PropertyNamingStrategies.SNAKE_CASE);
     }
 }

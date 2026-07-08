@@ -11,7 +11,7 @@ class JacksonConfigTest {
     @Test
     void instructionObjectMapperUsesSnakeCase() {
         JacksonConfig config = new JacksonConfig();
-        ObjectMapper mapper = config.instructionObjectMapper(new ObjectMapper());
+        ObjectMapper mapper = config.instructionObjectMapper();
         var tree = mapper.valueToTree(InstructionTestFixtures.sampleInstruction("I-1"));
         assertThat(tree.has("instruction_id")).isTrue();
         assertThat(tree.has("owning_lob")).isTrue();
