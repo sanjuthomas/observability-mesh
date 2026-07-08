@@ -1,0 +1,410 @@
+# SSI cash instruction lifecycle + Payment service — ZITADEL identity seed
+#
+# Roles    — functional permissions checked by OPA (what you CAN do)
+# Groups   — organisational membership checked by OPA (what you BELONG TO)
+#   MIDDLE_OFFICE          — active middle-office analyst/approver
+#   UP_TO_100_MILLION_CLUB — may create/approve payments up to $100 M
+#   UP_TO_1_BILLION_CLUB   — may create/approve payments up to $1 B
+#   UP_TO_100_BILLION_CLUB — may create/approve payments up to $100 B
+#   ADMIN                 — platform operator; required for secured admin UIs
+# covering_lobs — LOBs the user is assigned to cover for payment approval
+
+defaults:
+  password: "Password1!"
+  email_domain: ssi.local
+
+users:
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # MIDDLE OFFICE — SSI instruction creators / submitters
+  # MIDDLE_OFFICE is a group, not a role.
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  - user_id: mo-100
+    given_name: Sarah
+    family_name: Chen
+    title: Analyst
+    roles:
+      - INSTRUCTION_CREATOR
+    groups:
+      - MIDDLE_OFFICE
+    supervisor_id: mo-050
+
+  - user_id: mo-101
+    given_name: James
+    family_name: Patel
+    title: Analyst
+    roles:
+      - INSTRUCTION_CREATOR
+    groups:
+      - MIDDLE_OFFICE
+    supervisor_id: mo-050
+
+  - user_id: mo-050
+    given_name: David
+    family_name: Okonkwo
+    title: Vice President
+    roles:
+      - INSTRUCTION_CREATOR
+    groups:
+      - MIDDLE_OFFICE
+    supervisor_id: mo-010
+
+  - user_id: mo-010
+    given_name: Patricia
+    family_name: Walsh
+    title: Managing Director
+    roles:
+      - INSTRUCTION_CREATOR
+    groups:
+      - MIDDLE_OFFICE
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # FICC profit center — SSI instruction approvers
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  - user_id: ficc-201
+    given_name: Michael
+    family_name: Torres
+    title: Associate
+    lob: FICC
+    roles:
+      - INSTRUCTION_APPROVER
+    supervisor_id: ficc-300
+
+  - user_id: ficc-300
+    given_name: Elena
+    family_name: Vasquez
+    title: Vice President
+    lob: FICC
+    roles:
+      - INSTRUCTION_APPROVER
+    supervisor_id: ficc-400
+
+  - user_id: ficc-400
+    given_name: Robert
+    family_name: Kim
+    title: Managing Director
+    lob: FICC
+    roles:
+      - INSTRUCTION_APPROVER
+
+  - user_id: ficc-500
+    given_name: Caroline
+    family_name: Nguyen
+    title: Partner
+    lob: FICC
+    roles:
+      - INSTRUCTION_APPROVER
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # FX profit center — SSI instruction approvers
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  - user_id: fx-201
+    given_name: Amira
+    family_name: Hassan
+    title: Associate
+    lob: FX
+    roles:
+      - INSTRUCTION_APPROVER
+    supervisor_id: fx-300
+
+  - user_id: fx-300
+    given_name: Lucas
+    family_name: Berger
+    title: Vice President
+    lob: FX
+    roles:
+      - INSTRUCTION_APPROVER
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Rates desk — SSI instruction approver
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  - user_id: rates-201
+    given_name: Nina
+    family_name: Johansson
+    title: Associate
+    lob: DESK_RATES
+    roles:
+      - INSTRUCTION_APPROVER
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Front office — payment submitters (DRAFT → SUBMITTED)
+  #
+  # SUBMIT_PAYMENT requires PAYMENT_CREATOR + subject.lob matching the
+  # instruction owning LOB.  These users belong to the trading desk itself
+  # (front office), unlike middle-office creators who cover LOBs via list.
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  - user_id: fo-ficc-101
+    given_name: Alex
+    family_name: Morrison
+    title: Analyst
+    lob: FICC
+    roles:
+      - PAYMENT_CREATOR
+    supervisor_id: ficc-300
+
+  - user_id: fo-fx-101
+    given_name: Jordan
+    family_name: Blake
+    title: Analyst
+    lob: FX
+    roles:
+      - PAYMENT_CREATOR
+    supervisor_id: fx-300
+
+  - user_id: fo-rates-101
+    given_name: Sam
+    family_name: Okafor
+    title: Analyst
+    lob: DESK_RATES
+    roles:
+      - PAYMENT_CREATOR
+    supervisor_id: rates-201
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Instruction service account
+  # Used for service-to-service calls from instruction-service → authorization-service (OBO).
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  - user_id: svc-instruction
+    given_name: Instruction
+    family_name: Service
+    title: Service Account
+    roles:
+      - INSTRUCTION_VIEWER
+    groups: []
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Payment service account
+  # Used for OBO calls from payment-service → authorization-service and instruction-service.
+  # INSTRUCTION_MARKER is required for marking instructions USED during payment create.
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  - user_id: svc-payment
+    given_name: Payment
+    family_name: Service
+    title: Service Account
+    roles:
+      - INSTRUCTION_VIEWER
+      - INSTRUCTION_MARKER
+    groups: []
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # PAYMENT SERVICE USERS
+  #
+  # Roles:
+  #   PAYMENT_CREATOR  — may submit a payment (CREATE_PAYMENT)
+  #   FUNDING_APPROVER — may authorise a payment (APPROVE_PAYMENT);
+  #                      requires MIDDLE_OFFICE group + matching covering_lobs
+  #
+  # Demo scenario coverage:
+  #   pay-101/102/103  Middle-office creators — CREATE_PAYMENT requires covering_lobs
+  #   pay-201          Approver covering FICC + FX (1B limit)
+  #   pay-202          Approver covering FICC + DESK_RATES (1B limit)
+  #                    → LOB-coverage violation if asked to approve FX payment
+  #   pay-203          Dual-role analyst covering FX (100M limit)
+  #                    → self-approval violation demo
+  #   pay-204          Senior approver covering all three desks (100B limit)
+  #   pay-205          Dual-role VP covering FICC (1B limit)
+  #                    → self-approval violation demo
+  #   pay-300          Senior MD covering FICC + FX + DESK_RATES (100B limit)
+  #                    → 100B boundary demo (creates + approves if different user)
+  #   pay-400          Partner — highest authority, covers all desks (100B limit)
+  #                    → escalation / final-authority approver
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  # --- Pure payment creators (no approval authority) -----------------------
+
+  - user_id: pay-101
+    given_name: Emily
+    family_name: Rodriguez
+    title: Analyst
+    roles:
+      - PAYMENT_CREATOR
+    groups:
+      - MIDDLE_OFFICE
+      - UP_TO_100_MILLION_CLUB
+    covering_lobs:
+      - FICC
+      - FX
+    supervisor_id: pay-201
+
+  - user_id: pay-102
+    given_name: Kenji
+    family_name: Nakamura
+    title: Analyst
+    roles:
+      - PAYMENT_CREATOR
+    groups:
+      - MIDDLE_OFFICE
+      - UP_TO_100_MILLION_CLUB
+    covering_lobs:
+      - FICC
+      - FX
+    supervisor_id: pay-201
+
+  - user_id: pay-103
+    given_name: Priya
+    family_name: Sharma
+    title: Associate
+    roles:
+      - PAYMENT_CREATOR
+    groups:
+      - MIDDLE_OFFICE
+      - UP_TO_1_BILLION_CLUB
+    covering_lobs:
+      - FICC
+      - FX
+      - DESK_RATES
+    supervisor_id: pay-202
+
+  # --- Pure approvers (FUNDING_APPROVER only) --------------------------------
+
+  - user_id: pay-201
+    given_name: Sophie
+    family_name: Laurent
+    title: Vice President
+    roles:
+      - FUNDING_APPROVER
+    groups:
+      - MIDDLE_OFFICE
+      - UP_TO_1_BILLION_CLUB
+    covering_lobs:
+      - FICC
+      - FX
+    supervisor_id: pay-300
+
+  - user_id: pay-202
+    given_name: Marcus
+    family_name: Johnson
+    title: Vice President
+    roles:
+      - FUNDING_APPROVER
+    groups:
+      - MIDDLE_OFFICE
+      - UP_TO_1_BILLION_CLUB
+    covering_lobs:
+      - FICC
+      - DESK_RATES
+    supervisor_id: pay-300
+
+  # --- Dual-role holders (both PAYMENT_CREATOR and FUNDING_APPROVER) --------
+  # These users can create AND approve, but NOT approve their own payments.
+
+  - user_id: pay-203
+    given_name: Anna
+    family_name: Kowalski
+    title: Associate
+    roles:
+      - PAYMENT_CREATOR
+      - FUNDING_APPROVER
+    groups:
+      - MIDDLE_OFFICE
+      - UP_TO_100_MILLION_CLUB
+    covering_lobs:
+      - FX
+    supervisor_id: pay-201
+
+  - user_id: pay-205
+    given_name: Fatima
+    family_name: Al-Rashid
+    title: Vice President
+    roles:
+      - PAYMENT_CREATOR
+      - FUNDING_APPROVER
+    groups:
+      - MIDDLE_OFFICE
+      - UP_TO_1_BILLION_CLUB
+    covering_lobs:
+      - FICC
+    supervisor_id: pay-300
+
+  # --- Senior approvers (100B club) -----------------------------------------
+
+  - user_id: pay-204
+    given_name: Wei
+    family_name: Chen
+    title: Managing Director
+    roles:
+      - FUNDING_APPROVER
+    groups:
+      - MIDDLE_OFFICE
+      - UP_TO_100_BILLION_CLUB
+    covering_lobs:
+      - FICC
+      - FX
+      - DESK_RATES
+    supervisor_id: pay-400
+
+  - user_id: pay-300
+    given_name: Thomas
+    family_name: Bergmann
+    title: Managing Director
+    roles:
+      - PAYMENT_CREATOR
+      - FUNDING_APPROVER
+    groups:
+      - MIDDLE_OFFICE
+      - UP_TO_100_BILLION_CLUB
+    covering_lobs:
+      - FICC
+      - FX
+      - DESK_RATES
+    supervisor_id: pay-400
+
+  - user_id: pay-400
+    given_name: Victoria
+    family_name: Osei
+    title: Partner
+    roles:
+      - FUNDING_APPROVER
+    groups:
+      - MIDDLE_OFFICE
+      - UP_TO_100_BILLION_CLUB
+    covering_lobs:
+      - FICC
+      - FX
+      - DESK_RATES
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # PLATFORM ADMIN — secured browser UIs, test harness, ETL console, maintenance
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  - user_id: admin-001
+    given_name: Platform
+    family_name: Administrator
+    title: Platform Administrator
+    roles:
+      - PLATFORM_ADMIN
+      - INSTRUCTION_VIEWER
+    groups:
+      - ADMIN
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # COMPLIANCE — policy inquiry users for chat eligibility questions
+  #
+  # COMPLIANCE_ANALYST may call payment-service / instruction-service to ask who can approve
+  # a payment (live OPA evaluation). No payment or instruction mutation rights.
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  - user_id: comp-001
+    given_name: Alex
+    family_name: Morgan
+    title: Compliance Analyst
+    roles:
+      - COMPLIANCE_ANALYST
+    groups:
+      - COMPLIANCE
+
+  - user_id: comp-002
+    given_name: Jordan
+    family_name: Kim
+    title: Compliance Officer
+    roles:
+      - COMPLIANCE_ANALYST
+    groups:
+      - COMPLIANCE

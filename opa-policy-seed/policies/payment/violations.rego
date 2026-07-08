@@ -1,0 +1,148 @@
+package payment.lifecycle
+
+# ---------------------------------------------------------------------------
+# violations — named denial reasons returned alongside allow=false.
+#
+# The payment service queries /v1/data/payment/lifecycle/violations and maps
+# each key to a SecurityEvent message and severity level.
+#
+# Naming convention:
+#   ALERT_*   →  escalation-worthy violation (is_alert=true in authorization details)
+#   <others>  →  policy denial recorded as SecurityEvent severity=ALERT
+#
+# The payment service can also query the convenience boolean `is_alert` to
+# check whether at least one ALERT-severity violation is present without
+# iterating the full set:
+#   POST /v1/data/payment/lifecycle/is_alert
+# ---------------------------------------------------------------------------
+
+# ── Absolute payment ceiling (100 Billion) ──────────────────────────────────
+# Rule:     No single payment may exceed 100 Billion USD under any circumstances.
+#           The initiator must split the payment into smaller tranches.
+# Severity: ALERT — represents a controls bypass or rogue large-value transfer.
+
+violations["ALERT_AMOUNT_EXCEEDS_100B_LIMIT"] if {
+    input.action in {"CREATE", "UPDATE", "APPROVE"}
+    exceeds_absolute_limit
+}
+
+# ── Subject club ceiling exceeded ────────────────────────────────────────────
+# Rule:     The payment amount is within the absolute ceiling but exceeds the
+#           ceiling delegated to this subject via their club group membership.
+#           Example: a member of UP_TO_1_BILLION_CLUB attempting a 5B payment.
+# Severity: ALERT — subject is acting beyond their delegated authority.
+
+violations["ALERT_AMOUNT_EXCEEDS_SUBJECT_LIMIT"] if {
+    input.action in {"CREATE", "UPDATE", "APPROVE"}
+    exceeds_subject_limit
+}
+
+# ── Subject has no club group at all ─────────────────────────────────────────
+# Rule:     Subject holds the FUNDING_APPROVER role but has not been placed in
+#           any payment-limit club.  This is an identity misconfiguration.
+# Denial → ALERT security event — block the action; no amount limit can be validated.
+
+violations["NO_LIMIT_GROUP_ASSIGNED"] if {
+    input.action in {"CREATE", "UPDATE", "APPROVE"}
+    not has_any_limit_group
+}
+
+# ── Instruction lifecycle mismatch ───────────────────────────────────────────
+# Rule:     CREATE/UPDATE require the backing instruction to be in DRAFT,
+#           SUBMITTED, or APPROVED.  SUBMIT requires APPROVED.  APPROVE accepts
+#           APPROVED (STANDING) or USED (SINGLE_USE after submit saga).
+# Severity: ALERT when the action bypasses required controls.
+
+violations["ALERT_UNAPPROVED_INSTRUCTION"] if {
+    input.action in {"CREATE", "UPDATE"}
+    not instruction_usable_for_draft_payment
+}
+
+violations["ALERT_UNAPPROVED_INSTRUCTION"] if {
+    input.action == "SUBMIT"
+    not instruction_is_approved
+}
+
+violations["ALERT_UNAPPROVED_INSTRUCTION"] if {
+    input.action == "APPROVE"
+    not instruction_backing_valid_for_approval
+}
+
+# ── Expired instruction ───────────────────────────────────────────────────────
+# Rule:     The instruction's end_date has passed.  Routing payments through an
+#           expired instruction may violate regulatory standing instruction rules.
+# Severity: ALERT — compliance breach.
+
+violations["ALERT_EXPIRED_INSTRUCTION"] if {
+    input.action in {"CREATE", "UPDATE", "APPROVE"}
+    input.payment.instruction_end_date != ""
+    time.now_ns() >= time.parse_rfc3339_ns(input.payment.instruction_end_date)
+}
+
+# ── Approver not in MIDDLE_OFFICE group ───────────────────────────────────────
+# Rule:     Subject holds FUNDING_APPROVER role but is not a member of the
+#           MIDDLE_OFFICE group.  Holding the role alone is insufficient —
+#           the approver must be an active middle-office analyst.
+# Severity: ALERT — role assigned without the required group; potential
+#           misconfiguration or privilege escalation attempt.
+
+violations["ALERT_NOT_MIDDLE_OFFICE_GROUP"] if {
+    input.action == "APPROVE"
+    has_role("FUNDING_APPROVER")
+    not in_group("MIDDLE_OFFICE")
+}
+
+# ── Desk-coverage (LOB) violation ─────────────────────────────────────────────
+# Rule:     The approver is in MIDDLE_OFFICE but their covering_lobs attribute
+#           does not include the instruction's owning LOB.
+#           Example: Mike covers ["FX"] but tries to approve a FICC payment —
+#                    this must be blocked and logged.
+# Severity: ALERT — potential cross-desk interference or collusion attempt.
+
+violations["ALERT_LOB_COVERAGE_VIOLATION"] if {
+    input.action == "APPROVE"
+    has_role("FUNDING_APPROVER")
+    in_group("MIDDLE_OFFICE")
+    not covers_lob(input.payment.instruction_owning_lob)
+}
+
+# ── Self-approval (segregation of duties) ────────────────────────────────────
+# Rule:     The person who created the payment cannot also approve it.
+#           This applies even when the subject holds BOTH PAYMENT_CREATOR and
+#           FUNDING_APPROVER roles simultaneously.
+# Denial → ALERT security event — four-eyes principle violation.
+
+violations["SELF_APPROVAL"] if {
+    input.action == "APPROVE"
+    not payment_creator_is_not_approver
+}
+
+# ── Subordinate approving creator's payment (reporting-line conflict) ─────────
+# Rule:     If the approver reports directly to the payment creator (i.e.
+#           the creator is the approver's supervisor), the approval must be
+#           blocked.  A manager can exert undue influence over a subordinate's
+#           approval decision — this creates an unacceptable conflict of interest.
+#           The same principle applies in SSI instruction approvals.
+# Severity: ALERT — chain-of-command conflict; potential coercion or collusion.
+
+violations["ALERT_SUBORDINATE_APPROVING_CREATOR"] if {
+    input.action == "APPROVE"
+    has_role("FUNDING_APPROVER")
+    not payment_approver_not_subordinate_of_creator
+}
+
+# ---------------------------------------------------------------------------
+# is_alert — convenience rule
+#
+# True when at least one ALERT-level violation is present.
+# The payment service can query this directly to decide SecurityEvent severity
+# without iterating the full violations set.
+#
+#   POST /v1/data/payment/lifecycle/is_alert   { "input": { ... } }
+# ---------------------------------------------------------------------------
+
+is_alert if {
+    some v
+    violations[v]
+    startswith(v, "ALERT_")
+}
