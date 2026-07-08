@@ -6,13 +6,13 @@ x-otel-environment: &otel-environment
   OTEL_METRIC_EXPORT_INTERVAL: "15000"
 
 x-keycloak-environment: &keycloak-environment
-  OIDC_ISSUER_URL: http://localhost:9080/realms/sre-catalog
-  OIDC_JWK_SET_URI: http://keycloak:9080/realms/sre-catalog/protocol/openid-connect/certs
-  KEYCLOAK_TOKEN_URL: http://keycloak:9080/realms/sre-catalog/protocol/openid-connect/token
-  KEYCLOAK_CLIENT_ID: sre-catalog-ui
+  OIDC_ISSUER_URL: http://localhost:9080/realms/observability-mesh
+  OIDC_JWK_SET_URI: http://keycloak:9080/realms/observability-mesh/protocol/openid-connect/certs
+  KEYCLOAK_TOKEN_URL: http://keycloak:9080/realms/observability-mesh/protocol/openid-connect/token
+  KEYCLOAK_CLIENT_ID: observability-mesh-ui
   KEYCLOAK_CLIENT_SECRET: ""
 
-name: sre-catalog
+name: observability-mesh
 
 services:
   otel-collector:
@@ -32,7 +32,7 @@ services:
         condition: service_started
     restart: unless-stopped
     networks:
-      - sre-catalog-net
+      - observability-mesh-net
 
   prometheus:
     image: prom/prometheus:v2.55.1
@@ -58,7 +58,7 @@ services:
       start_period: 10s
     restart: unless-stopped
     networks:
-      - sre-catalog-net
+      - observability-mesh-net
 
   tempo:
     image: grafana/tempo:2.6.1
@@ -77,7 +77,7 @@ services:
       start_period: 15s
     restart: unless-stopped
     networks:
-      - sre-catalog-net
+      - observability-mesh-net
 
   grafana:
     image: grafana/grafana:11.4.0
@@ -104,13 +104,13 @@ services:
       start_period: 20s
     restart: unless-stopped
     networks:
-      - sre-catalog-net
+      - observability-mesh-net
 
   opensearch:
     image: opensearchproject/opensearch:2.11.1
     container_name: opensearch
     environment:
-      cluster.name: sre-catalog
+      cluster.name: observability-mesh
       node.name: opensearch
       discovery.type: single-node
       bootstrap.memory_lock: "true"
@@ -136,7 +136,7 @@ services:
       start_period: 30s
     restart: unless-stopped
     networks:
-      - sre-catalog-net
+      - observability-mesh-net
 
   opensearch-dashboards:
     image: opensearchproject/opensearch-dashboards:2.11.1
@@ -151,7 +151,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     networks:
-      - sre-catalog-net
+      - observability-mesh-net
 
   opa:
     image: openpolicyagent/opa:1.17.1
@@ -170,7 +170,7 @@ services:
       - ./opa-policy-seed/policies:/policies:ro
     restart: unless-stopped
     networks:
-      - sre-catalog-net
+      - observability-mesh-net
 
   opa-policy-seed:
     build: ./opa-policy-seed
@@ -184,7 +184,7 @@ services:
       - ./opa-policy-seed/policies:/policies:ro
     restart: "no"
     networks:
-      - sre-catalog-net
+      - observability-mesh-net
 
   mongodb:
     image: mongo:7
@@ -202,7 +202,7 @@ services:
       retries: 10
       start_period: 10s
     networks:
-      - sre-catalog-net
+      - observability-mesh-net
 
   mongo-init:
     image: mongo:7
@@ -236,7 +236,7 @@ services:
           }
         '
     networks:
-      - sre-catalog-net
+      - observability-mesh-net
 
   keycloak:
     image: quay.io/keycloak/keycloak:26.0.7
@@ -252,14 +252,14 @@ services:
       KC_HOSTNAME_STRICT_HTTPS: "false"
       KC_HTTP_ENABLED: "true"
     volumes:
-      - ./keycloak-seed/realm-sre-catalog.json:/opt/keycloak/data/import/realm-sre-catalog.json:ro
+      - ./keycloak-seed/realm-observability-mesh.json:/opt/keycloak/data/import/realm-observability-mesh.json:ro
     ports:
       - "9080:9080"
     healthcheck:
       test:
         [
           "CMD-SHELL",
-          "exec 3<>/dev/tcp/127.0.0.1/9080; echo -e 'GET /realms/sre-catalog/.well-known/openid-configuration HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3; cat <&3 | grep -q 200",
+          "exec 3<>/dev/tcp/127.0.0.1/9080; echo -e 'GET /realms/observability-mesh/.well-known/openid-configuration HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3; cat <&3 | grep -q 200",
         ]
       interval: 10s
       timeout: 10s
@@ -267,7 +267,7 @@ services:
       start_period: 40s
     restart: unless-stopped
     networks:
-      - sre-catalog-net
+      - observability-mesh-net
 
   keycloak-seed:
     build: ./keycloak-seed
@@ -277,12 +277,12 @@ services:
         condition: service_healthy
     environment:
       KEYCLOAK_URL: http://keycloak:9080
-      KEYCLOAK_REALM: sre-catalog
+      KEYCLOAK_REALM: observability-mesh
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
     restart: "no"
     networks:
-      - sre-catalog-net
+      - observability-mesh-net
 
   sequence-service:
     build:
@@ -303,7 +303,7 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
     networks:
-      - sre-catalog-net
+      - observability-mesh-net
 
   authorization-service:
     build:
@@ -326,7 +326,7 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
     networks:
-      - sre-catalog-net
+      - observability-mesh-net
 
   instruction-service:
     build:
@@ -359,7 +359,7 @@ services:
         condition: service_started
     restart: unless-stopped
     networks:
-      - sre-catalog-net
+      - observability-mesh-net
 
   payment-service:
     build:
@@ -395,7 +395,7 @@ services:
         condition: service_started
     restart: unless-stopped
     networks:
-      - sre-catalog-net
+      - observability-mesh-net
 
   ofac-service:
     build:
@@ -418,7 +418,7 @@ services:
         condition: service_started
     restart: unless-stopped
     networks:
-      - sre-catalog-net
+      - observability-mesh-net
 
   open-slo-repository:
     image: sanjuthomas/open-slo-repository:latest
@@ -438,7 +438,7 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
     networks:
-      - sre-catalog-net
+      - observability-mesh-net
 
   slo-provisioner-service:
     build:
@@ -469,7 +469,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     networks:
-      - sre-catalog-net
+      - observability-mesh-net
 
   demo-harness:
     build:
@@ -495,11 +495,11 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
     networks:
-      - sre-catalog-net
+      - observability-mesh-net
 
 networks:
-  sre-catalog-net:
-    name: sre-catalog-net
+  observability-mesh-net:
+    name: observability-mesh-net
 
 volumes:
   mongo-data:

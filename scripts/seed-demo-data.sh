@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Seed the SRE Catalog demo stack with instructions, payments, and ALERT security events.
+# Seed the Observability Mesh demo stack with instructions, payments, and ALERT security events.
 #
 # Usage (from repo root):
 #   ./scripts/seed-demo-data.sh

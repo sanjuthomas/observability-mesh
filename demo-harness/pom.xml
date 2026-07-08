@@ -4,20 +4,20 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <parent>
-        <groupId>com.srecatalog</groupId>
-        <artifactId>sre-catalog</artifactId>
+        <groupId>com.observabilitymesh</groupId>
+        <artifactId>observability-mesh</artifactId>
         <version>0.1.0-SNAPSHOT</version>
     </parent>
     <artifactId>demo-harness</artifactId>
     <packaging>jar</packaging>
     <dependencies>
         <dependency>
-            <groupId>com.srecatalog</groupId>
-            <artifactId>sre-catalog-common</artifactId>
+            <groupId>com.observabilitymesh</groupId>
+            <artifactId>observability-mesh-common</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.srecatalog</groupId>
-            <artifactId>sre-catalog-auth</artifactId>
+            <groupId>com.observabilitymesh</groupId>
+            <artifactId>observability-mesh-auth</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>

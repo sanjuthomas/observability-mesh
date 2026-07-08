@@ -1,10 +1,10 @@
 # AGENTS.md
 
-Guidance for AI coding agents working in **sre-catalog**.
+Guidance for AI coding agents working in **Observability Mesh** (`observability-mesh`).
 
 ## Project summary
 
-Java monorepo of Spring Boot microservices for policy-aware SSI cash instruction and payment lifecycle — a trimmed Java port of [policy-pilot](https://github.com/sanjuthomas/policy-pilot) with **MongoDB only** (no Kafka, Neo4j, or chat). Includes per-service browser UIs, demo harness, **Keycloak OIDC**, **OPA**, **OpenSLO repository**, **SLO provisioner (Sloth)**, **otel-collector**, **Prometheus**, **Tempo**, **Grafana**, and **OpenSearch**.
+**Observability Mesh** — Java monorepo with a demo workload (policy-aware SSI cash instruction and payment lifecycle, trimmed port of [policy-pilot](https://github.com/sanjuthomas/policy-pilot)) and a composable observability stack: **MongoDB only** (no Kafka, Neo4j, or chat), per-service browser UIs, demo harness, **Keycloak OIDC**, **OPA**, **OpenSLO repository**, **SLO provisioner (Sloth)**, **otel-collector**, **Prometheus**, **Tempo**, **Grafana**, and **OpenSearch**.
 
 Stack: Java **21**, Maven Wrapper (`./mvnw`), JaCoCo (**80% minimum overall coverage** per module).
 
@@ -37,7 +37,7 @@ Agents **must**:
 
 ## Code conventions
 
-- Package root: `com.srecatalog`
+- Package root: `com.observabilitymesh`
 - DTOs: Java `record`s with Jakarta validation
 - Persistence: Spring Data MongoDB + bitemporal `in`/`out` versioning
 - Errors: `ResponseStatusException` + `@ControllerAdvice` → JSON `ApiError`

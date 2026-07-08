@@ -1,10 +1,20 @@
-# SRE Catalog
+# Observability Mesh
 
-Reference stack for assembling a **service reliability catalog** — observability (logs, metrics, traces), OpenSLO authoring, and the backends to explore SLIs and (eventually) SLO dashboards.
+Reference stack for an **observability mesh** — logs, metrics, traces, OpenSLO authoring, and the backends to explore SLIs and SLO dashboards without enterprise platform overhead.
 
 The policy-aware SSI microservices platform is the **demo workload**: a trimmed Java port of [policy-pilot](https://github.com/sanjuthomas/policy-pilot) that exercises the catalog end-to-end. It generates realistic telemetry and business events (including sanction-scan latency) so you can see how the pieces fit together without building a production payments system first.
 
 OpenSLO documents are authored in [open-slo-repository](https://github.com/sanjuthomas/open-slo-repository) (included in Docker Compose). `slo-provisioner-service` compiles active SLOs through [Sloth](https://github.com/slok/sloth) into Prometheus recording rules for Grafana SLO dashboards (import [dashboard 14348](https://grafana.com/grafana/dashboards/14348-sloth-slo/) in Grafana OSS).
+
+## Why I built this
+
+In large enterprises, observability is often run by centralized platform teams with fancy, expensive tooling. That works when you are one of the big hitters — the high-traffic services whose telemetry justifies the spend. But if you run a small application, you may not need most of what those platforms offer. You still get pulled onto the same stack so the cost can be shared across the estate.
+
+At the other end of the spectrum, a small company wants reliable operations without buying an enterprise suite or hiring a dedicated SRE team on day one. You need logs, metrics, traces, and a path toward SLOs — but with a **minimum viable feature set**, not every bell and whistle.
+
+This repo is my answer: a **service reliability catalog** assembled from open-source and free tools, wired together so you can run a small application with a full observability stack — the same way data mesh thinking lets teams own their data products without waiting on a central warehouse team. Call it an **observability mesh**: each service exports OTLP, the catalog provides the shared backends (Prometheus, Tempo, Grafana, OpenSearch), and OpenSLO gives you a portable way to define what “good” looks like before you outgrow the setup.
+
+The Java microservices here are a **demo workload** to prove the catalog works end-to-end. You can swap them for your own services and keep the mesh.
 
 ## Architecture
 
@@ -63,7 +73,7 @@ flowchart LR
 
 ### Signal flow
 
-Instrumented Spring services (`instruction-service`, `payment-service`, `ofac-service`, `authorization-service`, `sequence-service`) depend on `shared/sre-catalog-telemetry`, which bundles:
+Instrumented Spring services (`instruction-service`, `payment-service`, `ofac-service`, `authorization-service`, `sequence-service`) depend on `shared/observability-mesh-telemetry`, which bundles:
 
 - **Metrics** — Micrometer OTLP export (`management.otlp.metrics.export.url`)
 - **Traces** — OpenTelemetry Spring Boot starter (`otel.exporter.otlp.endpoint`, `OTEL_EXPORTER_OTLP_*` env vars)
@@ -107,7 +117,7 @@ flowchart LR
 3. Run `sloth generate` and write `{sloName}.yml` under the shared rules directory; archive removed SLOs to `_archive/` (orphan policy: drop rules, mark `ARCHIVED` in `slo-provision-state` — Grafana objects are not deleted).
 4. `POST` Prometheus `/-/reload` when rules change.
 
-Datasource allowlist is configured in `application.properties` (`sre-catalog.slo-provisioner.datasource-names=payment-prometheus`). Emit matching metrics from the demo workload to evaluate SLOs in Grafana.
+Datasource allowlist is configured in `application.properties` (`observability-mesh.slo-provisioner.datasource-names=payment-prometheus`). Emit matching metrics from the demo workload to evaluate SLOs in Grafana.
 
 ### OpenSLO authoring
 

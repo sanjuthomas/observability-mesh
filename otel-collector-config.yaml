@@ -15,7 +15,7 @@ exporters:
   opensearch/logs:
     http:
       endpoint: http://opensearch:9200
-    dataset: sre-catalog
+    dataset: observability-mesh
     namespace: development
     logs_index: otel-logs
     mapping:

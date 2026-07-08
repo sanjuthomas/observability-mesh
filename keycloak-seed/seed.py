@@ -171,7 +171,7 @@ def main() -> int:
     args = parser.parse_args()
 
     base_url = os.environ.get("KEYCLOAK_URL", "http://localhost:9080")
-    realm = os.environ.get("KEYCLOAK_REALM", "sre-catalog")
+    realm = os.environ.get("KEYCLOAK_REALM", "observability-mesh")
     admin_user = os.environ.get("KEYCLOAK_ADMIN", "admin")
     admin_password = os.environ.get("KEYCLOAK_ADMIN_PASSWORD", "admin")
 
