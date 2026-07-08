@@ -53,6 +53,7 @@ Instrumented Spring services export logs, metrics, and traces over OTLP to a sin
 ```mermaid
 flowchart LR
     subgraph Apps[Instrumented services]
+        direction TB
         Inst[instruction-service]
         Pay[payment-service]
         Authz[authorization-service]
@@ -100,13 +101,32 @@ Grafana at http://localhost:3000 is pre-provisioned with Prometheus and Tempo da
 
 ```mermaid
 flowchart LR
-    SloAuth[SLO authoring service] --> Mongo[(MongoDB open-slo)]
-    Mongo -->|poll stale=false SLO + SLI| Prov[slo-provisioner-service]
-    Prov -->|OpenSLO v1 → v1alpha YAML| Sloth[Sloth CLI]
-    Sloth -->|Prometheus rules .yml| Rules[(shared rules volume)]
-    Rules --> Prom[Prometheus]
+    subgraph Authoring[Authoring]
+        direction TB
+        SloAuth[SLO authoring service]
+        Mongo[(MongoDB open-slo)]
+    end
+
+    subgraph Provisioning[Provisioning]
+        direction TB
+        Prov[slo-provisioner-service]
+        Sloth[Sloth CLI]
+    end
+
+    subgraph Metrics[Prometheus & Grafana]
+        direction TB
+        Rules[(shared rules volume)]
+        Prom[Prometheus]
+        Grafana[Grafana + Sloth dashboard 14348]
+    end
+
+    SloAuth --> Mongo
+    Mongo -->|poll stale=false SLO + SLI| Prov
+    Prov -->|OpenSLO v1 → v1alpha YAML| Sloth
+    Sloth -->|Prometheus rules .yml| Rules
+    Rules --> Prom
     Prov -->|POST /-/reload| Prom
-    Prom --> Grafana[Grafana + Sloth dashboard 14348]
+    Prom --> Grafana
 ```
 
 1. Read active `kind=SLO` documents from `service-level-objectives`; resolve `spec.indicatorRef` to the active `kind=SLI` document.
