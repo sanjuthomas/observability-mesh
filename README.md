@@ -114,9 +114,9 @@ flowchart LR
     end
 
     subgraph Metrics[Prometheus & Grafana]
-        direction TB
-        Prom[Prometheus]
+        direction TB        
         Grafana[Grafana + Sloth dashboard 14348]
+        Prom[Prometheus]
         Rules[(shared rules volume)]
     end
 
