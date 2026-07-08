@@ -17,7 +17,7 @@ class ServiceIdentityRetryTest {
     @Test
     void loginRetriesUntilSuccess() {
         PaymentProperties properties = new PaymentProperties(
-                "payments", "security_events", "payment_service",
+                "payments", "ofac-scan-requests", "security_events", "payment_service",
                 "svc-payment", "Password1!", "", "", "", 200);
         ServiceIdentity identity = new ServiceIdentity(loginClient, properties);
         when(loginClient.login("svc-payment", "Password1!"))
@@ -31,7 +31,7 @@ class ServiceIdentityRetryTest {
     @Test
     void ensureLoggedInTriggersLoginWhenMissing() {
         PaymentProperties properties = new PaymentProperties(
-                "payments", "security_events", "payment_service",
+                "payments", "ofac-scan-requests", "security_events", "payment_service",
                 "svc-payment", "Password1!", "", "", "", 200);
         ServiceIdentity identity = new ServiceIdentity(loginClient, properties);
         when(loginClient.login("svc-payment", "Password1!"))

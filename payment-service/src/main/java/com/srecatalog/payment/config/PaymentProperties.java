@@ -9,6 +9,7 @@ import java.util.stream.Collectors;
 @ConfigurationProperties(prefix = "sre-catalog.payment")
 public record PaymentProperties(
         String collection,
+        String ofacScanRequestsCollection,
         String securityEventsDatabase,
         String securityEventsCollection,
         String serviceUserId,

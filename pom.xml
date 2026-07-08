@@ -28,6 +28,7 @@
         <module>authorization-service</module>
         <module>instruction-service</module>
         <module>payment-service</module>
+        <module>ofac-service</module>
         <module>demo-harness</module>
     </modules>
 

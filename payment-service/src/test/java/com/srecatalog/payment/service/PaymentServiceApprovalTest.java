@@ -13,6 +13,8 @@ import com.srecatalog.payment.model.Payment;
 import com.srecatalog.payment.model.PaymentStatus;
 import com.srecatalog.payment.model.VersionedPayment;
 import com.srecatalog.payment.repo.PaymentRepository;
+import com.srecatalog.payment.ofac.OfacScanLifecycleStatus;
+import com.srecatalog.payment.ofac.OfacScanRequestRepository;
 import com.srecatalog.payment.security.SecurityEventRepository;
 import com.srecatalog.payment.web.dto.RejectPaymentRequest;
 import com.srecatalog.sequenceclient.SequenceClient;
@@ -41,6 +43,7 @@ class PaymentServiceApprovalTest {
 
     @Mock PaymentRepository repository;
     @Mock SecurityEventRepository securityEventRepository;
+    @Mock OfacScanRequestRepository ofacScanRequestRepository;
     @Mock AuthzClient authzClient;
     @Mock InstructionClient instructionClient;
     @Mock SequenceClient sequenceClient;
@@ -55,10 +58,10 @@ class PaymentServiceApprovalTest {
     @BeforeEach
     void setUp() {
         PaymentProperties properties = new PaymentProperties(
-                "payments", "security_events", "payment_service",
+                "payments", "ofac-scan-requests", "security_events", "payment_service",
                 "svc-payment", "Password1!", "", "", "", 200);
-        paymentService = new PaymentService(
-                repository, securityEventRepository, authzClient, instructionClient,
+        paymentService = PaymentServiceTestFixtures.paymentService(
+                repository, securityEventRepository, ofacScanRequestRepository, authzClient, instructionClient,
                 sequenceClient, serviceIdentity, properties);
         when(serviceIdentity.token()).thenReturn("svc-token");
         when(authzClient.evaluatePayment(any(), any(), any(), any(), any(), any(), any(), any(), any()))
@@ -72,10 +75,19 @@ class PaymentServiceApprovalTest {
         Payment payment = submittedSingleUse();
         when(repository.getCurrent("P-1")).thenReturn(v(payment));
         when(instructionClient.getInstruction(any(), any(), any())).thenReturn(objectMapper.readTree("""
-                {"status":"USED","instruction_type":"SINGLE_USE","version_number":1,"end_date":"2099-12-31T00:00:00Z"}
+                {"status":"USED","instruction_type":"SINGLE_USE","version_number":1,"end_date":"2099-12-31T00:00:00Z",
+                 "debtor_account":{"account_id":"D-1"},"creditor_account":{"account_id":"C-1"},
+                 "creditor":{"name":"Acme"},"intermediary_agents":[{"bic":"INTMUS33"}]}
                 """));
         VersionedPayment saved = paymentService.approve("P-1", approver, "t", "s");
         assertThat(saved.payment().status()).isEqualTo(PaymentStatus.APPROVED);
+        org.mockito.Mockito.verify(ofacScanRequestRepository).insert(org.mockito.ArgumentMatchers.argThat(request ->
+                request.paymentId().equals("P-1")
+                        && request.paymentVersion() == 2
+                        && request.versionNumber() == 1
+                        && request.creditorName().equals("Acme")
+                        && request.lifecycleStatus() == OfacScanLifecycleStatus.OPEN
+                        && request.result() == null));
     }
 
     @Test
@@ -87,6 +99,7 @@ class PaymentServiceApprovalTest {
                 """));
         VersionedPayment saved = paymentService.approve("P-1", approver, "t", "s");
         assertThat(saved.payment().status()).isEqualTo(PaymentStatus.CANCELLED);
+        org.mockito.Mockito.verify(ofacScanRequestRepository, org.mockito.Mockito.never()).insert(any());
     }
 
     @Test

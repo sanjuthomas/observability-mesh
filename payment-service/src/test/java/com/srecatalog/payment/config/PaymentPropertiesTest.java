@@ -9,7 +9,7 @@ class PaymentPropertiesTest {
     @Test
     void splitCsvHandlesNullAndBlank() {
         PaymentProperties properties = new PaymentProperties(
-                "payments", "security_events", "payment_service",
+                "payments", "ofac-scan-requests", "security_events", "payment_service",
                 "svc-payment", "Password1!", null, null, "  ", 200);
         assertThat(properties.complianceRoleSet()).isEmpty();
         assertThat(properties.securityEventExcludedUserIdSet()).isEmpty();
@@ -19,7 +19,7 @@ class PaymentPropertiesTest {
     @Test
     void splitCsvTrimsValues() {
         PaymentProperties properties = new PaymentProperties(
-                "payments", "security_events", "payment_service",
+                "payments", "ofac-scan-requests", "security_events", "payment_service",
                 "svc-payment", "Password1!", " ROLE_A , ROLE_B ", " admin-1 , ", "", 200);
         assertThat(properties.complianceRoleSet()).containsExactlyInAnyOrder("ROLE_A", "ROLE_B");
         assertThat(properties.securityEventExcludedUserIdSet()).containsExactly("admin-1");

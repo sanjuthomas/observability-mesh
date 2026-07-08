@@ -45,7 +45,7 @@ class PaymentControllerExtendedTest {
     @BeforeEach
     void setUp() {
         PaymentProperties properties = new PaymentProperties(
-                "payments", "security_events", "payment_service",
+                "payments", "ofac-scan-requests", "security_events", "payment_service",
                 "svc-payment", "Password1!", "COMPLIANCE_ANALYST", "", "", 200);
         mockMvc = MockMvcBuilders.standaloneSetup(
                 new PaymentController(paymentService, subjectResolver, properties)).build();

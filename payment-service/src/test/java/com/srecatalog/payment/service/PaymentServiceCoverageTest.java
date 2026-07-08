@@ -14,6 +14,7 @@ import com.srecatalog.payment.model.PaymentStatus;
 import com.srecatalog.payment.model.VersionedPayment;
 import com.srecatalog.payment.repo.PaymentNotFoundException;
 import com.srecatalog.payment.repo.PaymentRepository;
+import com.srecatalog.payment.ofac.OfacScanRequestRepository;
 import com.srecatalog.payment.security.SecurityEventRepository;
 import com.srecatalog.payment.web.dto.RejectPaymentRequest;
 import com.srecatalog.sequenceclient.SequenceClient;
@@ -46,6 +47,7 @@ class PaymentServiceCoverageTest {
 
     @Mock PaymentRepository repository;
     @Mock SecurityEventRepository securityEventRepository;
+    @Mock OfacScanRequestRepository ofacScanRequestRepository;
     @Mock AuthzClient authzClient;
     @Mock InstructionClient instructionClient;
     @Mock SequenceClient sequenceClient;
@@ -63,10 +65,10 @@ class PaymentServiceCoverageTest {
     @BeforeEach
     void setUp() {
         PaymentProperties properties = new PaymentProperties(
-                "payments", "security_events", "payment_service",
+                "payments", "ofac-scan-requests", "security_events", "payment_service",
                 "svc-payment", "Password1!", "COMPLIANCE_ANALYST", "", "", 200);
-        paymentService = new PaymentService(
-                repository, securityEventRepository, authzClient, instructionClient,
+        paymentService = PaymentServiceTestFixtures.paymentService(
+                repository, securityEventRepository, ofacScanRequestRepository, authzClient, instructionClient,
                 sequenceClient, serviceIdentity, properties);
         when(serviceIdentity.token()).thenReturn("svc-token");
         when(securityEventRepository.allocateEventId(any())).thenReturn("SE-1");

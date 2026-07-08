@@ -1,6 +1,7 @@
 package com.srecatalog.payment.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.srecatalog.authzclient.AuthzClient;
 import com.srecatalog.common.model.PolicyDecision;
 import com.srecatalog.common.model.Subject;
@@ -10,6 +11,9 @@ import com.srecatalog.payment.client.InstructionNotFoundException;
 import com.srecatalog.payment.client.InstructionStateException;
 import com.srecatalog.payment.config.PaymentProperties;
 import com.srecatalog.payment.config.ServiceIdentity;
+import com.srecatalog.payment.ofac.OfacScanRequest;
+import com.srecatalog.payment.ofac.OfacScanRequestFactory;
+import com.srecatalog.payment.ofac.OfacScanRequestRepository;
 import com.srecatalog.payment.model.LifecycleEvent;
 import com.srecatalog.payment.model.Payment;
 import com.srecatalog.payment.model.PaymentAction;
@@ -26,8 +30,10 @@ import com.srecatalog.sequenceclient.SequenceClient;
 import com.srecatalog.sequenceclient.SequenceClientException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
@@ -48,27 +54,36 @@ public class PaymentService {
 
     private final PaymentRepository repository;
     private final SecurityEventRepository securityEventRepository;
+    private final OfacScanRequestRepository ofacScanRequestRepository;
     private final AuthzClient authzClient;
     private final InstructionClient instructionClient;
     private final SequenceClient sequenceClient;
     private final ServiceIdentity serviceIdentity;
     private final PaymentProperties properties;
+    private final ObjectMapper objectMapper;
+    private final TransactionTemplate transactionTemplate;
 
     public PaymentService(
             PaymentRepository repository,
             SecurityEventRepository securityEventRepository,
+            OfacScanRequestRepository ofacScanRequestRepository,
             AuthzClient authzClient,
             InstructionClient instructionClient,
             SequenceClient sequenceClient,
             ServiceIdentity serviceIdentity,
-            PaymentProperties properties) {
+            PaymentProperties properties,
+            ObjectMapper objectMapper,
+            @Qualifier("paymentTransactionTemplate") TransactionTemplate transactionTemplate) {
         this.repository = repository;
         this.securityEventRepository = securityEventRepository;
+        this.ofacScanRequestRepository = ofacScanRequestRepository;
         this.authzClient = authzClient;
         this.instructionClient = instructionClient;
         this.sequenceClient = sequenceClient;
         this.serviceIdentity = serviceIdentity;
         this.properties = properties;
+        this.objectMapper = objectMapper;
+        this.transactionTemplate = transactionTemplate;
     }
 
     public VersionedPayment create(
@@ -257,7 +272,8 @@ public class PaymentService {
                 text(instruction, "status"),
                 bearerToken,
                 sessionId,
-                false);
+                false,
+                instruction);
     }
 
     public VersionedPayment reject(
@@ -383,12 +399,31 @@ public class PaymentService {
             String bearerToken,
             String sessionId,
             boolean skipAuthorize) {
+        return persistNewVersion(
+                payment, action, subject, details, instructionEndDate, instructionStatus,
+                bearerToken, sessionId, skipAuthorize, null);
+    }
+
+    private VersionedPayment persistNewVersion(
+            Payment payment,
+            PaymentAction action,
+            Subject subject,
+            Map<String, Object> details,
+            String instructionEndDate,
+            String instructionStatus,
+            String bearerToken,
+            String sessionId,
+            boolean skipAuthorize,
+            JsonNode instructionForOfac) {
         if (!skipAuthorize) {
             Map<String, Object> authorization = authorize(
                     action, subject, payment, instructionEndDate, instructionStatus, bearerToken, sessionId);
             details = PaymentAuthorization.detailsWithAuthorization(details, authorization);
         }
         recordEvent(payment, action, subject, details);
+        if (action == PaymentAction.APPROVE && instructionForOfac != null) {
+            return saveApprovalWithSecurityEventAndOfacScan(payment, action, subject, details, instructionForOfac);
+        }
         return saveWithSecurityEvent(payment, action, subject, details, false);
     }
 
@@ -439,6 +474,27 @@ public class PaymentService {
             securityEventRepository.insert(event, eventId);
         }
         return saved;
+    }
+
+    private VersionedPayment saveApprovalWithSecurityEventAndOfacScan(
+            Payment payment,
+            PaymentAction action,
+            Subject subject,
+            Map<String, Object> details,
+            JsonNode instruction) {
+        return transactionTemplate.execute(status -> {
+            VersionedPayment saved = repository.appendVersion(payment);
+            if (shouldRecordSecurityEvent(subject)) {
+                String eventId = securityEventRepository.allocateEventId(payment.paymentId());
+                PaymentSecurityEvent event = PaymentSecurityEvent.authorizedAction(
+                        action, subject, saved.payment(), saved.versionNumber(), details);
+                securityEventRepository.insert(event, eventId);
+            }
+            OfacScanRequest ofacRequest = OfacScanRequestFactory.from(
+                    saved.payment(), instruction, saved.versionNumber(), objectMapper);
+            ofacScanRequestRepository.insert(ofacRequest);
+            return saved;
+        });
     }
 
     private void recordEvent(Payment payment, PaymentAction action, Subject subject, Map<String, Object> details) {

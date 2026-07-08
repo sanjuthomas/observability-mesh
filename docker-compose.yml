@@ -393,6 +393,29 @@ services:
     networks:
       - sre-catalog-net
 
+  ofac-service:
+    build:
+      context: .
+      dockerfile: ofac-service/Dockerfile
+    container_name: ofac-service
+    ports:
+      - "9096:9096"
+    environment:
+      <<: *otel-environment
+      OTEL_SERVICE_NAME: ofac-service
+      MONGODB_URI: mongodb://mongodb:27017/?replicaSet=rs0
+      MONGODB_DATABASE: ssi_cash_activities
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      mongo-init:
+        condition: service_completed_successfully
+      payment-service:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - sre-catalog-net
+
   open-slo-repository:
     image: sanjuthomas/open-slo-repository:latest
     platform: linux/amd64

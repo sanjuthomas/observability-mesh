@@ -16,6 +16,7 @@ flowchart LR
     Authz --> OPA[OPA]
     Inst --> Mongo[(MongoDB)]
     Pay --> Mongo
+    OFAC[ofac-service] --> Mongo
     Seq[sequence-service] --> Mongo
     Inst --> Seq
     Pay --> Seq
@@ -29,9 +30,32 @@ flowchart LR
 
 OpenSLO authoring (`open-slo-repository`) is part of the stack but omitted here; it will be shown in a separate diagram when SLO dashboard flow is added.
 
-**In scope:** instruction, payment, authorization, and sequence services; demo harness; per-service browser UIs; OPA policies; Keycloak seed; OpenSLO repository; metrics and trace visualization.
+**In scope:** instruction, payment, authorization, sequence, and OFAC (sanction scan simulator) services; demo harness; per-service browser UIs; OPA policies; Keycloak seed; OpenSLO repository; metrics and trace visualization.
 
 **Out of scope (by design):** Kafka, Neo4j, indexer, chat/RAG.
+
+## Sanction scanning (OFAC)
+
+When a payment is **approved**, `payment-service` writes three documents in a **single MongoDB transaction**:
+
+1. the new bitemporal payment version (`payments`),
+2. a security event (`payment_service` in the `security_events` DB), and
+3. an OFAC scan request (`ofac-scan-requests`) capturing payment id, owning LOB, debtor/creditor accounts, creditor name, and intermediaries.
+
+`ofac-service` is a **fake sanction scanner** that simulates the vendor software large banks license rather than build (keeping pace with OFAC/Washington rule changes and the associated liability is hard). It runs a batch poll every **30 seconds**:
+
+1. reads all **current** scan requests with `lifecycle_status = OPEN`,
+2. claims each by appending a new version with `lifecycle_status = IN_PROGRESS`,
+3. simulates the scan by waiting **30–60 seconds**, then
+4. appends a final version with `lifecycle_status = PROCESSED` and a `result` of `PASSED` or `FAILED`.
+
+Scan requests are versioned bitemporally (`in` / `out`, current sentinel `9999-12-31T23:59:59Z`) with `_id = {paymentId}|{paymentVersion}|{versionNumber}`, so each lifecycle transition is a new immutable version:
+
+```
+v1 OPEN  →  v2 IN_PROGRESS  →  v3 PROCESSED (PASSED | FAILED)
+```
+
+The simulated delay intentionally generates latency data for future **sanction scan SLI/SLO** work (e.g. time from `requested_at` to `PROCESSED`, or backlog of `OPEN` requests).
 
 ## Stack
 
@@ -71,6 +95,7 @@ If another Docker stack already uses names like `mongodb` or `opensearch`, stop 
 |-----|---------|
 | http://localhost:9000/ui/ | Instruction browser |
 | http://localhost:9093/ui/ | Payment browser |
+| http://localhost:9096/actuator/health | OFAC scan simulator (batch processor) |
 | http://localhost:9094/ui/ | Authorization user directory |
 | http://localhost:9091 | Demo harness |
 | http://localhost:9090 | OpenSLO repository (`openslo` / `openslo123`) |
@@ -105,6 +130,7 @@ Point a locally running service at the collector with `OTEL_EXPORTER_OTLP_ENDPOI
 ├── shared/                  # Common libraries (auth, authz client, telemetry, …)
 ├── instruction-service/
 ├── payment-service/
+├── ofac-service/            # Sanction scan simulator (batch processor)
 ├── authorization-service/
 ├── sequence-service/
 ├── demo-harness/
@@ -122,7 +148,7 @@ Point a locally running service at the collector with `OTEL_EXPORTER_OTLP_ENDPOI
 
 ### Signal flow
 
-Instrumented Spring services (`instruction-service`, `payment-service`, `authorization-service`, `sequence-service`) depend on `shared/sre-catalog-telemetry`, which bundles:
+Instrumented Spring services (`instruction-service`, `payment-service`, `ofac-service`, `authorization-service`, `sequence-service`) depend on `shared/sre-catalog-telemetry`, which bundles:
 
 - **Metrics** — Micrometer OTLP export (`management.otlp.metrics.export.url`)
 - **Traces** — OpenTelemetry Spring Boot starter (`otel.exporter.otlp.endpoint`, `OTEL_EXPORTER_OTLP_*` env vars)

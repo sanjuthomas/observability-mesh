@@ -36,7 +36,7 @@ class SecurityEventUiControllerTest {
     @BeforeEach
     void setUp() {
         PaymentProperties properties = new PaymentProperties(
-                "payments", "security_events", "payment_service",
+                "payments", "ofac-scan-requests", "security_events", "payment_service",
                 "svc-payment", "Password1!", "", "", "", 200);
         mockMvc = MockMvcBuilders.standaloneSetup(
                 new SecurityEventUiController(securityEventRepository, subjectResolver, properties)).build();

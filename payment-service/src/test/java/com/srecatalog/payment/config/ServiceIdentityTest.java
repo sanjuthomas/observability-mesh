@@ -19,7 +19,7 @@ class ServiceIdentityTest {
     @Test
     void loginCachesToken() {
         PaymentProperties properties = new PaymentProperties(
-                "payments", "security_events", "payment_service",
+                "payments", "ofac-scan-requests", "security_events", "payment_service",
                 "svc-payment", "Password1!", "", "", "", 200);
         ServiceIdentity identity = new ServiceIdentity(loginClient, properties);
         when(loginClient.login("svc-payment", "Password1!"))
@@ -33,7 +33,7 @@ class ServiceIdentityTest {
     @Test
     void loginSkipsWhenAlreadyAuthenticated() {
         PaymentProperties properties = new PaymentProperties(
-                "payments", "security_events", "payment_service",
+                "payments", "ofac-scan-requests", "security_events", "payment_service",
                 "svc-payment", "Password1!", "", "", "", 200);
         ServiceIdentity identity = new ServiceIdentity(loginClient, properties);
         when(loginClient.login("svc-payment", "Password1!"))
@@ -47,7 +47,7 @@ class ServiceIdentityTest {
     @Test
     void loginGivesUpAfterMaxAttempts() {
         PaymentProperties properties = new PaymentProperties(
-                "payments", "security_events", "payment_service",
+                "payments", "ofac-scan-requests", "security_events", "payment_service",
                 "svc-payment", "Password1!", "", "", "", 200);
         ServiceIdentity identity = new ServiceIdentity(loginClient, properties);
         when(loginClient.login("svc-payment", "Password1!"))

@@ -12,6 +12,7 @@ import com.srecatalog.payment.model.Payment;
 import com.srecatalog.payment.model.PaymentStatus;
 import com.srecatalog.payment.model.VersionedPayment;
 import com.srecatalog.payment.repo.PaymentRepository;
+import com.srecatalog.payment.ofac.OfacScanRequestRepository;
 import com.srecatalog.payment.security.SecurityEventRepository;
 import com.srecatalog.sequenceclient.SequenceClient;
 import com.srecatalog.sequenceclient.SequenceClientException;
@@ -37,6 +38,7 @@ class PaymentServiceValidationTest {
 
     @Mock PaymentRepository repository;
     @Mock SecurityEventRepository securityEventRepository;
+    @Mock OfacScanRequestRepository ofacScanRequestRepository;
     @Mock AuthzClient authzClient;
     @Mock InstructionClient instructionClient;
     @Mock SequenceClient sequenceClient;
@@ -51,10 +53,10 @@ class PaymentServiceValidationTest {
     @BeforeEach
     void setUp() {
         PaymentProperties properties = new PaymentProperties(
-                "payments", "security_events", "payment_service",
+                "payments", "ofac-scan-requests", "security_events", "payment_service",
                 "svc-payment", "Password1!", "", "", "", 200);
-        paymentService = new PaymentService(
-                repository, securityEventRepository, authzClient, instructionClient,
+        paymentService = PaymentServiceTestFixtures.paymentService(
+                repository, securityEventRepository, ofacScanRequestRepository, authzClient, instructionClient,
                 sequenceClient, serviceIdentity, properties);
         when(serviceIdentity.token()).thenReturn("svc-token");
         when(authzClient.evaluatePayment(any(), any(), any(), any(), any(), any(), any(), any(), any()))

@@ -41,7 +41,7 @@ class SecurityEventRepositoryTest {
     @BeforeEach
     void setUp() {
         PaymentProperties properties = new PaymentProperties(
-                "payments", "security_events", "payment_service",
+                "payments", "ofac-scan-requests", "security_events", "payment_service",
                 "svc-payment", "Password1!", "", "", "", 200);
         repository = new SecurityEventRepository(mongoTemplate, configuredMapper(), sequenceClient, properties);
     }
