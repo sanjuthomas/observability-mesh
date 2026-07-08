@@ -1,6 +1,7 @@
 package com.observabilitymesh.ofac.service;
 
 import com.observabilitymesh.ofac.config.OfacProperties;
+import com.observabilitymesh.ofac.metrics.SanctionScanMetrics;
 import com.observabilitymesh.ofac.model.OfacScanLifecycleStatus;
 import com.observabilitymesh.ofac.model.OfacScanRequestRef;
 import com.observabilitymesh.ofac.model.OfacScanResult;
@@ -12,6 +13,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Random;
 
@@ -26,15 +29,18 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class OfacScanProcessorTest {
 
+    private static final Instant REQUESTED_AT = Instant.parse("2026-01-01T00:00:00Z");
+
     @Mock OfacScanRequestRepository repository;
     @Mock Random random;
+    @Mock SanctionScanMetrics sanctionScanMetrics;
 
     private OfacScanProcessor processor;
 
     @BeforeEach
     void setUp() {
         OfacProperties properties = new OfacProperties("ofac-scan-requests", 30_000, 0, 0);
-        processor = new OfacScanProcessor(repository, properties, Runnable::run, random);
+        processor = new OfacScanProcessor(repository, properties, Runnable::run, random, sanctionScanMetrics);
     }
 
     @Test
@@ -48,23 +54,25 @@ class OfacScanProcessorTest {
 
     @Test
     void pollClaimsOpenRequestAndCompletesScan() {
-        OfacScanRequestRef open = new OfacScanRequestRef("P-1", 2, 1);
-        OfacScanRequestRef inProgress = new OfacScanRequestRef("P-1", 2, 2);
-        OfacScanRequestRef processed = new OfacScanRequestRef("P-1", 2, 3);
+        OfacScanRequestRef open = new OfacScanRequestRef("P-1", 2, 1, REQUESTED_AT);
+        OfacScanRequestRef inProgress = new OfacScanRequestRef("P-1", 2, 2, REQUESTED_AT);
+        OfacScanRequestRef processed = new OfacScanRequestRef("P-1", 2, 3, REQUESTED_AT);
         when(repository.listOpenCurrent()).thenReturn(List.of(open));
         when(repository.transition("P-1", 2, 1, OfacScanLifecycleStatus.IN_PROGRESS, null)).thenReturn(inProgress);
         when(repository.transition("P-1", 2, 2, OfacScanLifecycleStatus.PROCESSED, OfacScanResult.PASSED))
                 .thenReturn(processed);
+        when(random.nextInt(100)).thenReturn(1);
         when(random.nextBoolean()).thenReturn(true);
 
         processor.pollOpenRequests();
 
         verify(repository).transition("P-1", 2, 2, OfacScanLifecycleStatus.PROCESSED, OfacScanResult.PASSED);
+        verify(sanctionScanMetrics).recordCompletion(eq(OfacScanResult.PASSED), any(Duration.class));
     }
 
     @Test
     void pollSkipsRequestLostToConcurrentClaim() {
-        OfacScanRequestRef open = new OfacScanRequestRef("P-1", 2, 1);
+        OfacScanRequestRef open = new OfacScanRequestRef("P-1", 2, 1, REQUESTED_AT);
         when(repository.listOpenCurrent()).thenReturn(List.of(open));
         when(repository.transition("P-1", 2, 1, OfacScanLifecycleStatus.IN_PROGRESS, null))
                 .thenThrow(new ConcurrentModificationException("already claimed"));
@@ -73,12 +81,14 @@ class OfacScanProcessorTest {
 
         verify(repository, never()).transition(
                 eq("P-1"), eq(2), eq(2), eq(OfacScanLifecycleStatus.PROCESSED), any());
+        verify(sanctionScanMetrics, never()).recordCompletion(any(), any());
     }
 
     @Test
     void scanDelayUsesConfiguredRange() {
         OfacProperties properties = new OfacProperties("ofac-scan-requests", 30_000, 30_000, 60_000);
-        OfacScanProcessor rangedProcessor = new OfacScanProcessor(repository, properties, Runnable::run, random);
+        OfacScanProcessor rangedProcessor = new OfacScanProcessor(
+                repository, properties, Runnable::run, random, sanctionScanMetrics);
         when(random.nextLong(30_001)).thenReturn(5_000L);
 
         assertThat(rangedProcessor.scanDelayMs()).isEqualTo(35_000);
@@ -91,13 +101,20 @@ class OfacScanProcessorTest {
 
     @Test
     void pickResultAlternatesBetweenPassedAndFailed() {
+        when(random.nextInt(100)).thenReturn(1);
         when(random.nextBoolean()).thenReturn(false);
         assertThat(processor.pickResult()).isEqualTo(OfacScanResult.FAILED);
     }
 
     @Test
+    void pickResultReturnsUnableToDetermineRoughlyOnePercent() {
+        when(random.nextInt(100)).thenReturn(0);
+        assertThat(processor.pickResult()).isEqualTo(OfacScanResult.UNABLE_TO_DETERMINE);
+    }
+
+    @Test
     void completeAfterDelayHandlesInterrupted() {
-        OfacScanRequestRef inProgress = new OfacScanRequestRef("P-1", 2, 2);
+        OfacScanRequestRef inProgress = new OfacScanRequestRef("P-1", 2, 2, REQUESTED_AT);
         Thread.currentThread().interrupt();
         try {
             processor.completeAfterDelay(inProgress, 0);
@@ -106,11 +123,13 @@ class OfacScanProcessorTest {
         }
         verify(repository, never()).transition(
                 eq("P-1"), eq(2), eq(2), eq(OfacScanLifecycleStatus.PROCESSED), any());
+        verify(sanctionScanMetrics, never()).recordCompletion(any(), any());
     }
 
     @Test
     void completeAfterDelayHandlesCompletionRace() {
-        OfacScanRequestRef inProgress = new OfacScanRequestRef("P-1", 2, 2);
+        OfacScanRequestRef inProgress = new OfacScanRequestRef("P-1", 2, 2, REQUESTED_AT);
+        when(random.nextInt(100)).thenReturn(1);
         when(random.nextBoolean()).thenReturn(true);
         when(repository.transition("P-1", 2, 2, OfacScanLifecycleStatus.PROCESSED, OfacScanResult.PASSED))
                 .thenThrow(new ConcurrentModificationException("lost race"));
@@ -118,5 +137,19 @@ class OfacScanProcessorTest {
         processor.completeAfterDelay(inProgress, 0);
 
         verify(repository).transition("P-1", 2, 2, OfacScanLifecycleStatus.PROCESSED, OfacScanResult.PASSED);
+        verify(sanctionScanMetrics, never()).recordCompletion(any(), any());
+    }
+
+    @Test
+    void completeAfterDelaySkipsMetricsWhenRequestedAtMissing() {
+        OfacScanRequestRef inProgress = new OfacScanRequestRef("P-1", 2, 2, null);
+        when(random.nextInt(100)).thenReturn(1);
+        when(random.nextBoolean()).thenReturn(true);
+        when(repository.transition("P-1", 2, 2, OfacScanLifecycleStatus.PROCESSED, OfacScanResult.PASSED))
+                .thenReturn(new OfacScanRequestRef("P-1", 2, 3, null));
+
+        processor.completeAfterDelay(inProgress, 0);
+
+        verify(sanctionScanMetrics, never()).recordCompletion(any(), any());
     }
 }

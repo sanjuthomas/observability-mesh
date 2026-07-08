@@ -16,6 +16,7 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 
+import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -46,7 +47,8 @@ class OfacScanRequestRepositoryTest {
 
         List<OfacScanRequestRef> refs = repository.listOpenCurrent();
 
-        assertThat(refs).containsExactly(new OfacScanRequestRef("P-1", 2, 1));
+        assertThat(refs).containsExactly(
+                new OfacScanRequestRef("P-1", 2, 1, Instant.parse("2026-07-08T12:00:00Z")));
     }
 
     @Test
@@ -62,7 +64,8 @@ class OfacScanRequestRepositoryTest {
         OfacScanRequestRef saved = repository.transition(
                 "P-1", 2, 1, OfacScanLifecycleStatus.IN_PROGRESS, null);
 
-        assertThat(saved).isEqualTo(new OfacScanRequestRef("P-1", 2, 2));
+        assertThat(saved).isEqualTo(
+                new OfacScanRequestRef("P-1", 2, 2, Instant.parse("2026-07-08T12:00:00Z")));
 
         ArgumentCaptor<Document> insertCaptor = ArgumentCaptor.forClass(Document.class);
         verify(mongoTemplate).insert(insertCaptor.capture(), eq("ofac-scan-requests"));

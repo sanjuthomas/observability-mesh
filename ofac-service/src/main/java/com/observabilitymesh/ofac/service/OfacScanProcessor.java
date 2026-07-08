@@ -1,6 +1,7 @@
 package com.observabilitymesh.ofac.service;
 
 import com.observabilitymesh.ofac.config.OfacProperties;
+import com.observabilitymesh.ofac.metrics.SanctionScanMetrics;
 import com.observabilitymesh.ofac.model.OfacScanLifecycleStatus;
 import com.observabilitymesh.ofac.model.OfacScanRequestRef;
 import com.observabilitymesh.ofac.model.OfacScanResult;
@@ -13,6 +14,8 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Random;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 
@@ -25,16 +28,19 @@ public class OfacScanProcessor {
     private final OfacProperties properties;
     private final Executor scanExecutor;
     private final Random random;
+    private final SanctionScanMetrics sanctionScanMetrics;
 
     public OfacScanProcessor(
             OfacScanRequestRepository repository,
             OfacProperties properties,
             Executor ofacScanExecutor,
-            Random ofacScanRandom) {
+            Random ofacScanRandom,
+            SanctionScanMetrics sanctionScanMetrics) {
         this.repository = repository;
         this.properties = properties;
         this.scanExecutor = ofacScanExecutor;
         this.random = ofacScanRandom;
+        this.sanctionScanMetrics = sanctionScanMetrics;
     }
 
     @Scheduled(fixedDelayString = "${observability-mesh.ofac.poll-interval-ms:30000}")
@@ -85,6 +91,7 @@ public class OfacScanProcessor {
                     inProgress.versionNumber(),
                     OfacScanLifecycleStatus.PROCESSED,
                     result);
+            recordCompletionMetric(inProgress, result);
             log.info("OFAC scan completed payment_id={} payment_version={} version_number={} result={}",
                     processed.paymentId(), processed.paymentVersion(), processed.versionNumber(), result);
         } catch (InterruptedException ex) {
@@ -107,6 +114,17 @@ public class OfacScanProcessor {
     }
 
     OfacScanResult pickResult() {
+        if (random.nextInt(100) == 0) {
+            return OfacScanResult.UNABLE_TO_DETERMINE;
+        }
         return random.nextBoolean() ? OfacScanResult.PASSED : OfacScanResult.FAILED;
+    }
+
+    private void recordCompletionMetric(OfacScanRequestRef inProgress, OfacScanResult result) {
+        if (inProgress.requestedAt() == null) {
+            return;
+        }
+        Duration duration = Duration.between(inProgress.requestedAt(), Instant.now());
+        sanctionScanMetrics.recordCompletion(result, duration);
     }
 }

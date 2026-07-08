@@ -115,9 +115,12 @@ public class OfacScanRequestRepository {
     }
 
     private static OfacScanRequestRef toRef(Document document) {
+        String requestedAtValue = document.getString("requested_at");
+        Instant requestedAt = requestedAtValue == null ? null : Instant.parse(requestedAtValue);
         return new OfacScanRequestRef(
                 document.getString("payment_id"),
                 document.getInteger("payment_version"),
-                document.getInteger("version_number"));
+                document.getInteger("version_number"),
+                requestedAt);
     }
 }
