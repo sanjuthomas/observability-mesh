@@ -29,6 +29,7 @@
         <module>instruction-service</module>
         <module>payment-service</module>
         <module>ofac-service</module>
+        <module>slo-author-service</module>
         <module>slo-provisioner-service</module>
         <module>demo-harness</module>
     </modules>

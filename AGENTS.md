@@ -4,7 +4,7 @@ Guidance for AI coding agents working in **Observability Mesh** (`observability-
 
 ## Project summary
 
-**Observability Mesh** — Java monorepo with a demo workload (policy-aware SSI cash instruction and payment lifecycle, trimmed port of [policy-pilot](https://github.com/sanjuthomas/policy-pilot)) and a composable observability stack: **MongoDB only** (no Kafka, Neo4j, or chat), per-service browser UIs, demo harness, **Keycloak OIDC**, **OPA**, **OpenSLO repository**, **SLO provisioner (Sloth)**, **otel-collector**, **Prometheus**, **Tempo**, **Grafana**, and **OpenSearch**.
+**Observability Mesh** — Java monorepo with a demo workload (policy-aware SSI cash instruction and payment lifecycle, trimmed port of [policy-pilot](https://github.com/sanjuthomas/policy-pilot)) and a composable observability stack: **MongoDB only** (no Kafka, Neo4j, or chat), per-service browser UIs, demo harness, **Keycloak OIDC**, **OPA**, **SLO author service (OpenSLO authoring)**, **SLO provisioner (Sloth)**, **otel-collector**, **Prometheus**, **Tempo**, **Grafana**, and **OpenSearch**.
 
 Stack: Java **21**, Maven Wrapper (`./mvnw`), JaCoCo (**80% minimum overall coverage** per module).
 
@@ -57,6 +57,7 @@ docker compose up -d                    # full stack
 |-----|---------|
 | http://localhost:9000/ui/ | Instruction browser |
 | http://localhost:9093/ui/ | Payment browser |
+| http://localhost:9090/ui/ | SLO author service (OpenSLO authoring) |
 | http://localhost:9096/actuator/health | OFAC scan simulator |
 | http://localhost:9097/actuator/health | SLO provisioner (OpenSLO → Sloth) |
 | http://localhost:9094/ui/ | Authorization user directory |

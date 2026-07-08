@@ -4,7 +4,7 @@ Reference stack for an **observability mesh** — logs, metrics, traces, OpenSLO
 
 The policy-aware SSI microservices platform is the **demo workload**: a trimmed Java port of [policy-pilot](https://github.com/sanjuthomas/policy-pilot) that exercises the catalog end-to-end. It generates realistic telemetry and business events (including sanction-scan latency) so you can see how the pieces fit together without building a production payments system first.
 
-OpenSLO documents are authored in [open-slo-repository](https://github.com/sanjuthomas/open-slo-repository) (included in Docker Compose). `slo-provisioner-service` compiles active SLOs through [Sloth](https://github.com/slok/sloth) into Prometheus recording rules for Grafana SLO dashboards (import [dashboard 14348](https://grafana.com/grafana/dashboards/14348-sloth-slo/) in Grafana OSS).
+OpenSLO documents are authored in `slo-author-service` (a Keycloak-secured Spring Boot service and browser UI in this monorepo). `slo-provisioner-service` compiles active SLOs through [Sloth](https://github.com/slok/sloth) into Prometheus recording rules for Grafana SLO dashboards (import [dashboard 14348](https://grafana.com/grafana/dashboards/14348-sloth-slo/) in Grafana OSS).
 
 ## Why I built this
 
@@ -31,16 +31,14 @@ flowchart LR
     Inst --> Mongo[(MongoDB)]
     Pay --> Mongo
     OFAC[ofac-service] --> Mongo
-    SLOProv[slo-provisioner-service] --> Mongo
-    SLOProv --> PromRules[(Prometheus Sloth rules)]
     Seq[sequence-service] --> Mongo
     Inst --> Seq
     Pay --> Seq
 ```
 
-OpenSLO authoring (`open-slo-repository`) and SLO provisioning (`slo-provisioner-service`) are part of the stack; see **OpenSLO → Sloth → Prometheus** below for the compile path.
+OpenSLO authoring (`slo-author-service`) and SLO provisioning (`slo-provisioner-service`) are part of the stack but omitted here; see **OpenSLO → Sloth → Prometheus** under Observability for that path.
 
-**In scope:** instruction, payment, authorization, sequence, OFAC (sanction scan simulator), and SLO provisioner services; demo harness; per-service browser UIs; OPA policies; Keycloak seed; OpenSLO repository; metrics and trace visualization.
+**In scope:** instruction, payment, authorization, sequence, OFAC (sanction scan simulator), SLO author, and SLO provisioner services; demo harness; per-service browser UIs; OPA policies; Keycloak seed; metrics and trace visualization.
 
 **Out of scope (by design):** Kafka, Neo4j, indexer, chat/RAG.
 
@@ -60,7 +58,6 @@ flowchart LR
         Authz[authorization-service]
         Seq[sequence-service]
         OFAC[ofac-service]
-        SLOProv[slo-provisioner-service]
     end
     Apps -->|OTLP gRPC :4317| OTel[otel-collector]
     OTel -->|logs pipeline| OS[OpenSearch]
@@ -95,7 +92,7 @@ Grafana at http://localhost:3000 is pre-provisioned with Prometheus and Tempo da
 3. Open Grafana → **Explore** → **Tempo** — search by `service.name` (e.g. `instruction-service`)
 4. For logs, use OpenSearch Dashboards (index pattern `otel-logs*`)
 
-`demo-harness` and `open-slo-repository` are not on the shared telemetry module yet.
+`demo-harness` is not on the shared telemetry module yet.
 
 ### OpenSLO → Sloth → Prometheus
 
@@ -103,7 +100,7 @@ Grafana at http://localhost:3000 is pre-provisioned with Prometheus and Tempo da
 
 ```mermaid
 flowchart LR
-    UI[open-slo-repository UI] --> Mongo[(MongoDB open-slo)]
+    SloAuth[SLO authoring service] --> Mongo[(MongoDB open-slo)]
     Mongo -->|poll stale=false SLO + SLI| Prov[slo-provisioner-service]
     Prov -->|OpenSLO v1 → v1alpha YAML| Sloth[Sloth CLI]
     Sloth -->|Prometheus rules .yml| Rules[(shared rules volume)]
@@ -121,7 +118,7 @@ Datasource allowlist is configured in `application.properties` (`observability-m
 
 ### OpenSLO authoring
 
-The `open-slo-repository` service stores OpenSLO v1 documents in MongoDB (`open-slo` database, `service-level-objectives` collection) on the same MongoDB instance as the application services.
+`slo-author-service` (port 9090) is where developers author, validate, and version OpenSLO v1 documents through a browser UI and REST API. Documents are validated with the [open-slo-java-sdk](https://github.com/sanjuthomas/open-slo-java-sdk) and stored in MongoDB (`open-slo` database, `service-level-objectives` collection) on the same MongoDB instance as the application services. It authenticates against Keycloak (OIDC) like the other services — sign in at http://localhost:9090/ui/ with demo credentials **`admin-001`** / **`Password1!`** (any user from [keycloak-seed/users.yaml](keycloak-seed/users.yaml) works); the `/api/v1/documents/**` API is JWT-protected. `slo-provisioner-service` then reads those active SLOs and translates them into Prometheus rules via Sloth.
 
 ## Sanction scanning (OFAC)
 
@@ -156,7 +153,7 @@ The simulated delay intentionally generates latency data for future **sanction s
 | Identity | Keycloak (OIDC) |
 | Policy | OPA (Rego) |
 | Data | MongoDB replica set |
-| SLO authoring | [open-slo-repository](https://github.com/sanjuthomas/open-slo-repository) |
+| SLO authoring | `slo-author-service` (OpenSLO v1 + [open-slo-java-sdk](https://github.com/sanjuthomas/open-slo-java-sdk)) |
 | SLO provisioning | [Sloth](https://github.com/slok/sloth) → Prometheus recording rules |
 | Observability | OTel Collector, Prometheus, Tempo, Grafana, OpenSearch, OpenSearch Dashboards |
 | Quality gate | JaCoCo ≥ 80% per module (`./mvnw verify`) |
@@ -189,7 +186,7 @@ If another Docker stack already uses names like `mongodb` or `opensearch`, stop 
 | http://localhost:9097/actuator/health | SLO provisioner (OpenSLO → Sloth batch) |
 | http://localhost:9094/ui/ | Authorization user directory |
 | http://localhost:9091 | Demo harness |
-| http://localhost:9090 | OpenSLO repository (`openslo` / `openslo123`) |
+| http://localhost:9090/ui/ | SLO authoring service (`admin-001` / `Password1!`) |
 | http://localhost:9080 | Keycloak admin (`admin` / `admin`) |
 | http://localhost:3000 | Grafana (`admin` / `admin`) — metrics & traces |
 | http://localhost:9092 | Prometheus UI |
@@ -222,6 +219,7 @@ Point a locally running service at the collector with `OTEL_EXPORTER_OTLP_ENDPOI
 ├── instruction-service/
 ├── payment-service/
 ├── ofac-service/            # Sanction scan simulator (batch processor)
+├── slo-author-service/      # OpenSLO authoring UI + API (Keycloak OIDC)
 ├── slo-provisioner-service/ # OpenSLO → Sloth → Prometheus rules batch
 ├── authorization-service/
 ├── sequence-service/

@@ -420,21 +420,24 @@ services:
     networks:
       - observability-mesh-net
 
-  open-slo-repository:
-    image: sanjuthomas/open-slo-repository:latest
-    platform: linux/amd64
-    container_name: open-slo-repository
+  slo-author-service:
+    build:
+      context: .
+      dockerfile: slo-author-service/Dockerfile
+    container_name: slo-author-service
     ports:
       - "9090:9090"
     environment:
+      <<: [*otel-environment, *keycloak-environment]
+      OTEL_SERVICE_NAME: slo-author-service
       MONGODB_URI: mongodb://mongodb:27017/?replicaSet=rs0
       MONGODB_DATABASE: open-slo
-      OPENSLO_SECURITY_USERNAME: openslo
-      OPENSLO_SECURITY_PASSWORD: openslo123
     depends_on:
       mongodb:
         condition: service_healthy
       mongo-init:
+        condition: service_completed_successfully
+      keycloak-seed:
         condition: service_completed_successfully
     restart: unless-stopped
     networks:
@@ -463,7 +466,7 @@ services:
         condition: service_healthy
       mongo-init:
         condition: service_completed_successfully
-      open-slo-repository:
+      slo-author-service:
         condition: service_started
       prometheus:
         condition: service_healthy
