@@ -16,6 +16,23 @@ This repo is my answer: a **service reliability catalog** assembled from open-so
 
 The Java microservices here are a **demo workload** to prove the catalog works end-to-end. You can swap them for your own services and keep the mesh.
 
+## Operating model
+
+Application teams are the natural owners of observability for their services — they know the SLIs, write the OpenSLO documents, instrument their code, and care about whether dashboards and alerts reflect real user impact. Running a full observability stack alongside that work is a different job: image version upgrades, security patches, storage provisioning, retention policies, collector tuning, and keeping Grafana/Prometheus/Tempo/OpenSearch healthy across environments.
+
+A practical split is to **bring the tooling closer to the application without phasing out the centralized observability team**. The platform team curates and operates the mesh **building blocks**; application teams **compose and consume** them for their own workloads.
+
+| Responsibility | Centralized observability team | Application team |
+|----------------|-------------------------------|------------------|
+| **Platform images & versions** | Build, patch, and publish curated images for the collector, Prometheus, Tempo, Grafana, OpenSearch, and mesh services (e.g. `slo-author-service`, `slo-provisioner-service`) | Pull pinned versions from the platform catalog; do not fork or patch base images locally |
+| **Storage & capacity** | Provision and operate backing storage (volumes, retention, backups, index lifecycle) | Declare expected signal volume and retention needs; stay within agreed quotas |
+| **Security & compliance** | Apply security patches, manage TLS/secrets patterns, and run platform upgrades on a schedule | Use platform-provided auth (Keycloak OIDC), export OTLP only to approved endpoints, follow instrumentation standards |
+| **Instrumentation** | Maintain shared libraries (e.g. `observability-mesh-telemetry`) and collector routing conventions | Instrument services, set `OTEL_SERVICE_NAME`, emit metrics/traces/logs over OTLP |
+| **SLOs & reliability goals** | Operate Sloth provisioning, Prometheus rule reload, and baseline Grafana datasources/dashboards | Author and version OpenSLO documents, define SLIs/SLOs for their services, review burn-rate dashboards |
+| **Compose & run** | Publish reference Compose/Kubernetes manifests and environment contracts (ports, env vars, volume mounts) | Compose the mesh alongside their application stack; configure app-specific scrape labels and SLO namespaces |
+
+In this repo, `docker-compose.yml` is the **reference composition**: the platform team would own the observability service definitions and image pins; an application team adds their services, points them at the shared collector, and uses `slo-author-service` for their OpenSLO catalog. The goal is federated ownership — applications stay close to their telemetry and SLOs, while the central team absorbs the undifferentiated heavy lifting of running the stack.
+
 ## Architecture
 
 The diagram below is the **demo application** — services, auth, policy, and persistence that drive the catalog.
