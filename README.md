@@ -1,6 +1,6 @@
 # Observability Mesh
 
-Reference stack for an **observability mesh** — logs, metrics, traces, OpenSLO authoring, and the backends to explore SLIs and SLO dashboards without enterprise platform overhead.
+Reference stack for **observability sovereignty without enterprise licensing** — an **observability mesh** with logs, metrics, traces, OpenSLO authoring, and the backends to explore SLIs and SLO dashboards.
 
 The policy-aware SSI microservices platform is the **demo workload**: a trimmed Java port of [policy-pilot](https://github.com/sanjuthomas/policy-pilot) that exercises the catalog end-to-end. It generates realistic telemetry and business events (including sanction-scan latency) so you can see how the pieces fit together without building a production payments system first.
 
