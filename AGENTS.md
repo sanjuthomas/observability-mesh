@@ -4,7 +4,7 @@ Guidance for AI coding agents working in **sre-catalog**.
 
 ## Project summary
 
-Java monorepo of Spring Boot microservices for policy-aware SSI cash instruction and payment lifecycle — a trimmed Java port of [policy-pilot](https://github.com/sanjuthomas/policy-pilot) with **MongoDB only** (no Kafka, Neo4j, or chat). Includes per-service browser UIs, demo harness, **Keycloak OIDC**, **OPA**, **otel-collector**, **Prometheus**, **Tempo**, **Grafana**, and **OpenSearch**.
+Java monorepo of Spring Boot microservices for policy-aware SSI cash instruction and payment lifecycle — a trimmed Java port of [policy-pilot](https://github.com/sanjuthomas/policy-pilot) with **MongoDB only** (no Kafka, Neo4j, or chat). Includes per-service browser UIs, demo harness, **Keycloak OIDC**, **OPA**, **OpenSLO repository**, **SLO provisioner (Sloth)**, **otel-collector**, **Prometheus**, **Tempo**, **Grafana**, and **OpenSearch**.
 
 Stack: Java **21**, Maven Wrapper (`./mvnw`), JaCoCo (**80% minimum overall coverage** per module).
 
@@ -58,6 +58,7 @@ docker compose up -d                    # full stack
 | http://localhost:9000/ui/ | Instruction browser |
 | http://localhost:9093/ui/ | Payment browser |
 | http://localhost:9096/actuator/health | OFAC scan simulator |
+| http://localhost:9097/actuator/health | SLO provisioner (OpenSLO → Sloth) |
 | http://localhost:9094/ui/ | Authorization user directory |
 | http://localhost:9091 | Demo harness |
 | http://localhost:9080 | Keycloak admin |

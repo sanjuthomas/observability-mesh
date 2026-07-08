@@ -1,10 +1,14 @@
 # SRE Catalog
 
-Policy-aware SSI microservices platform in Java — a trimmed port of [policy-pilot](https://github.com/sanjuthomas/policy-pilot) focused on **MongoDB-only** persistence, **Keycloak OIDC**, **OPA authorization**, and **observability** (logs, metrics, traces) via OpenTelemetry, Prometheus, Tempo, Grafana, and OpenSearch.
+Reference stack for assembling a **service reliability catalog** — observability (logs, metrics, traces), OpenSLO authoring, and the backends to explore SLIs and (eventually) SLO dashboards.
 
-OpenSLO documents are authored in [open-slo-repository](https://github.com/sanjuthomas/open-slo-repository) (included in Docker Compose). Grafana SLO dashboards compiled from those definitions are planned as a follow-on.
+The policy-aware SSI microservices platform is the **demo workload**: a trimmed Java port of [policy-pilot](https://github.com/sanjuthomas/policy-pilot) that exercises the catalog end-to-end. It generates realistic telemetry and business events (including sanction-scan latency) so you can see how the pieces fit together without building a production payments system first.
+
+OpenSLO documents are authored in [open-slo-repository](https://github.com/sanjuthomas/open-slo-repository) (included in Docker Compose). `slo-provisioner-service` compiles active SLOs through [Sloth](https://github.com/slok/sloth) into Prometheus recording rules for Grafana SLO dashboards (import [dashboard 14348](https://grafana.com/grafana/dashboards/14348-sloth-slo/) in Grafana OSS).
 
 ## Architecture
+
+The diagram below is the **demo application** — services, auth, policy, and persistence that drive the catalog.
 
 ```mermaid
 flowchart LR
@@ -17,26 +21,101 @@ flowchart LR
     Inst --> Mongo[(MongoDB)]
     Pay --> Mongo
     OFAC[ofac-service] --> Mongo
+    SLOProv[slo-provisioner-service] --> Mongo
+    SLOProv --> PromRules[(Prometheus Sloth rules)]
     Seq[sequence-service] --> Mongo
     Inst --> Seq
     Pay --> Seq
-    Services[Instrumented services] -->|OTLP| OTel[otel-collector]
-    OTel --> OS[OpenSearch]
-    OTel --> Prom[Prometheus]
-    OTel --> Tempo[Tempo]
-    Prom --> Grafana[Grafana]
-    Tempo --> Grafana
 ```
 
-OpenSLO authoring (`open-slo-repository`) is part of the stack but omitted here; it will be shown in a separate diagram when SLO dashboard flow is added.
+OpenSLO authoring (`open-slo-repository`) and SLO provisioning (`slo-provisioner-service`) are part of the stack; see **OpenSLO → Sloth → Prometheus** below for the compile path.
 
-**In scope:** instruction, payment, authorization, sequence, and OFAC (sanction scan simulator) services; demo harness; per-service browser UIs; OPA policies; Keycloak seed; OpenSLO repository; metrics and trace visualization.
+**In scope:** instruction, payment, authorization, sequence, OFAC (sanction scan simulator), and SLO provisioner services; demo harness; per-service browser UIs; OPA policies; Keycloak seed; OpenSLO repository; metrics and trace visualization.
 
 **Out of scope (by design):** Kafka, Neo4j, indexer, chat/RAG.
 
+## Observability
+
+This is the core of the catalog: how signals leave the demo workload and land in stores you can query.
+
+### OTLP flow
+
+Instrumented Spring services export logs, metrics, and traces over OTLP to a single collector, which fans out to the storage backends below.
+
+```mermaid
+flowchart LR
+    subgraph Apps[Instrumented services]
+        Inst[instruction-service]
+        Pay[payment-service]
+        Authz[authorization-service]
+        Seq[sequence-service]
+        OFAC[ofac-service]
+        SLOProv[slo-provisioner-service]
+    end
+    Apps -->|OTLP gRPC :4317| OTel[otel-collector]
+    OTel -->|logs pipeline| OS[OpenSearch]
+    OTel -->|metrics pipeline| Prom[Prometheus :8889]
+    OTel -->|traces pipeline| Tempo[Tempo]
+    Prom --> Grafana[Grafana]
+    Tempo --> Grafana
+    OS --> OSD[OpenSearch Dashboards]
+```
+
+### Signal flow
+
+Instrumented Spring services (`instruction-service`, `payment-service`, `ofac-service`, `authorization-service`, `sequence-service`) depend on `shared/sre-catalog-telemetry`, which bundles:
+
+- **Metrics** — Micrometer OTLP export (`management.otlp.metrics.export.url`)
+- **Traces** — OpenTelemetry Spring Boot starter (`otel.exporter.otlp.endpoint`, `OTEL_EXPORTER_OTLP_*` env vars)
+
+Docker Compose sets a shared OTLP endpoint and per-service `OTEL_SERVICE_NAME`. The collector fans out to backends:
+
+| Signal | App export | Collector pipeline | Storage | View in |
+|--------|------------|-------------------|---------|---------|
+| **Logs** | OTLP | `logs` → OpenSearch | `otel-logs*` index | OpenSearch Dashboards (index pattern `otel-logs*`) |
+| **Metrics** | OTLP | `metrics` → Prometheus exporter `:8889` | Prometheus TSDB | Grafana → Explore → Prometheus |
+| **Traces** | OTLP | `traces` → Tempo | Tempo local storage | Grafana → Explore → Tempo |
+
+Grafana at http://localhost:3000 is pre-provisioned with Prometheus and Tempo datasources.
+
+### Try it
+
+1. Start the stack and seed demo data: `./scripts/seed-demo-data.sh`
+2. Open Grafana → **Explore** → **Prometheus** — e.g. `rate(http_server_requests_seconds_count{service_name="instruction-service"}[5m])`
+3. Open Grafana → **Explore** → **Tempo** — search by `service.name` (e.g. `instruction-service`)
+4. For logs, use OpenSearch Dashboards (index pattern `otel-logs*`)
+
+`demo-harness` and `open-slo-repository` are not on the shared telemetry module yet.
+
+### OpenSLO → Sloth → Prometheus
+
+`slo-provisioner-service` is a Spring Boot batch worker (poll every 60s) that keeps Prometheus recording rules in sync with active OpenSLO documents in MongoDB:
+
+```mermaid
+flowchart LR
+    UI[open-slo-repository UI] --> Mongo[(MongoDB open-slo)]
+    Mongo -->|poll stale=false SLO + SLI| Prov[slo-provisioner-service]
+    Prov -->|OpenSLO v1 → v1alpha YAML| Sloth[Sloth CLI]
+    Sloth -->|Prometheus rules .yml| Rules[(shared rules volume)]
+    Rules --> Prom[Prometheus]
+    Prov -->|POST /-/reload| Prom
+    Prom --> Grafana[Grafana + Sloth dashboard 14348]
+```
+
+1. Read active `kind=SLO` documents from `service-level-objectives`; resolve `spec.indicatorRef` to the active `kind=SLI` document.
+2. Compile OpenSLO v1 + SLI `ratioMetric` queries into OpenSLO v1alpha YAML for Sloth (inlines PromQL, maps `30d` windows, normalizes `[5m]` → `[{{.window}}]`).
+3. Run `sloth generate` and write `{sloName}.yml` under the shared rules directory; archive removed SLOs to `_archive/` (orphan policy: drop rules, mark `ARCHIVED` in `slo-provision-state` — Grafana objects are not deleted).
+4. `POST` Prometheus `/-/reload` when rules change.
+
+Datasource allowlist is configured in `application.properties` (`sre-catalog.slo-provisioner.datasource-names=payment-prometheus`). Emit matching metrics from the demo workload to evaluate SLOs in Grafana.
+
+### OpenSLO authoring
+
+The `open-slo-repository` service stores OpenSLO v1 documents in MongoDB (`open-slo` database, `service-level-objectives` collection) on the same MongoDB instance as the application services.
+
 ## Sanction scanning (OFAC)
 
-When a payment is **approved**, `payment-service` writes three documents in a **single MongoDB transaction**:
+Part of the demo workload: when a payment is **approved**, `payment-service` writes three documents in a **single MongoDB transaction**:
 
 1. the new bitemporal payment version (`payments`),
 2. a security event (`payment_service` in the `security_events` DB), and
@@ -68,6 +147,7 @@ The simulated delay intentionally generates latency data for future **sanction s
 | Policy | OPA (Rego) |
 | Data | MongoDB replica set |
 | SLO authoring | [open-slo-repository](https://github.com/sanjuthomas/open-slo-repository) |
+| SLO provisioning | [Sloth](https://github.com/slok/sloth) → Prometheus recording rules |
 | Observability | OTel Collector, Prometheus, Tempo, Grafana, OpenSearch, OpenSearch Dashboards |
 | Quality gate | JaCoCo ≥ 80% per module (`./mvnw verify`) |
 
@@ -96,6 +176,7 @@ If another Docker stack already uses names like `mongodb` or `opensearch`, stop 
 | http://localhost:9000/ui/ | Instruction browser |
 | http://localhost:9093/ui/ | Payment browser |
 | http://localhost:9096/actuator/health | OFAC scan simulator (batch processor) |
+| http://localhost:9097/actuator/health | SLO provisioner (OpenSLO → Sloth batch) |
 | http://localhost:9094/ui/ | Authorization user directory |
 | http://localhost:9091 | Demo harness |
 | http://localhost:9090 | OpenSLO repository (`openslo` / `openslo123`) |
@@ -131,6 +212,7 @@ Point a locally running service at the collector with `OTEL_EXPORTER_OTLP_ENDPOI
 ├── instruction-service/
 ├── payment-service/
 ├── ofac-service/            # Sanction scan simulator (batch processor)
+├── slo-provisioner-service/ # OpenSLO → Sloth → Prometheus rules batch
 ├── authorization-service/
 ├── sequence-service/
 ├── demo-harness/
@@ -143,38 +225,6 @@ Point a locally running service at the collector with `OTEL_EXPORTER_OTLP_ENDPOI
 ├── docker-compose.yml
 └── scripts/seed-demo-data.sh
 ```
-
-## Observability
-
-### Signal flow
-
-Instrumented Spring services (`instruction-service`, `payment-service`, `ofac-service`, `authorization-service`, `sequence-service`) depend on `shared/sre-catalog-telemetry`, which bundles:
-
-- **Metrics** — Micrometer OTLP export (`management.otlp.metrics.export.url`)
-- **Traces** — OpenTelemetry Spring Boot starter (`otel.exporter.otlp.endpoint`, `OTEL_EXPORTER_OTLP_*` env vars)
-
-Docker Compose sets a shared OTLP endpoint and per-service `OTEL_SERVICE_NAME`. The collector fans out to backends:
-
-| Signal | App export | Collector pipeline | Storage | View in |
-|--------|------------|-------------------|---------|---------|
-| **Logs** | OTLP | `logs` → OpenSearch | `otel-logs*` index | OpenSearch Dashboards (index pattern `otel-logs*`) |
-| **Metrics** | OTLP | `metrics` → Prometheus exporter `:8889` | Prometheus TSDB | Grafana → Explore → Prometheus |
-| **Traces** | OTLP | `traces` → Tempo | Tempo local storage | Grafana → Explore → Tempo |
-
-Grafana at http://localhost:3000 is pre-provisioned with Prometheus and Tempo datasources.
-
-### Try it
-
-1. Start the stack and seed demo data: `./scripts/seed-demo-data.sh`
-2. Open Grafana → **Explore** → **Prometheus** — e.g. `rate(http_server_requests_seconds_count{service_name="instruction-service"}[5m])`
-3. Open Grafana → **Explore** → **Tempo** — search by `service.name` (e.g. `instruction-service`)
-4. For logs, use OpenSearch Dashboards (index pattern `otel-logs*`)
-
-`demo-harness` and `open-slo-repository` are not on the shared telemetry module yet.
-
-### OpenSLO
-
-The `open-slo-repository` service stores OpenSLO v1 documents in MongoDB (`open-slo` database, `service-level-objectives` collection) on the same MongoDB instance as the application services. Compiling those definitions into Grafana SLO dashboards is planned as a separate step.
 
 ## Reset
 

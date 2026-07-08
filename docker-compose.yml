@@ -45,6 +45,7 @@ services:
       - "9092:9090"
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-sloth-rules:/etc/prometheus/rules-sloth
       - prometheus-data:/prometheus
     depends_on:
       otel-collector:
@@ -229,6 +230,9 @@ services:
           const sloDb = db.getSiblingDB("open-slo");
           if (!sloDb.getCollectionNames().includes("service-level-objectives")) {
             sloDb.createCollection("service-level-objectives");
+          }
+          if (!sloDb.getCollectionNames().includes("slo-provision-state")) {
+            sloDb.createCollection("slo-provision-state");
           }
         '
     networks:
@@ -436,6 +440,37 @@ services:
     networks:
       - sre-catalog-net
 
+  slo-provisioner-service:
+    build:
+      context: .
+      dockerfile: slo-provisioner-service/Dockerfile
+    container_name: slo-provisioner-service
+    ports:
+      - "9097:9097"
+    environment:
+      <<: *otel-environment
+      OTEL_SERVICE_NAME: slo-provisioner-service
+      MONGODB_URI: mongodb://mongodb:27017/?replicaSet=rs0
+      MONGODB_DATABASE: open-slo
+      PROMETHEUS_RULES_DIR: /rules
+      PROMETHEUS_RELOAD_URL: http://prometheus:9090/-/reload
+      SLO_PROVISIONER_WORK_DIR: /work
+      SLOTH_BINARY: /usr/local/bin/sloth
+    volumes:
+      - prometheus-sloth-rules:/rules
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      mongo-init:
+        condition: service_completed_successfully
+      open-slo-repository:
+        condition: service_started
+      prometheus:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - sre-catalog-net
+
   demo-harness:
     build:
       context: .
@@ -470,5 +505,6 @@ volumes:
   mongo-data:
   opensearch-data:
   prometheus-data:
+  prometheus-sloth-rules:
   tempo-data:
   grafana-data:
