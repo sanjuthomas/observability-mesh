@@ -115,9 +115,9 @@ flowchart LR
 
     subgraph Metrics[Prometheus & Grafana]
         direction TB
-        Rules[(shared rules volume)]
         Prom[Prometheus]
         Grafana[Grafana + Sloth dashboard 14348]
+        Rules[(shared rules volume)]
     end
 
     SloAuth --> Mongo
