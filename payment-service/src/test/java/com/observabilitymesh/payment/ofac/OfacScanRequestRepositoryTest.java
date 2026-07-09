@@ -31,7 +31,7 @@ class OfacScanRequestRepositoryTest {
     @BeforeEach
     void setUp() {
         PaymentProperties properties = new PaymentProperties(
-                "payments", "ofac-scan-requests", "security_events", "payment_service",
+                "payments", "ofac", "scan-requests", "security_events", "payment_service",
                 "svc-payment", "Password1!", "", "", "", 200);
         repository = new OfacScanRequestRepository(mongoTemplate, paymentObjectMapper(), properties);
     }
@@ -59,7 +59,7 @@ class OfacScanRequestRepositoryTest {
         repository.insert(request);
 
         ArgumentCaptor<Document> documentCaptor = ArgumentCaptor.forClass(Document.class);
-        verify(mongoTemplate).insert(documentCaptor.capture(), eq("ofac-scan-requests"));
+        verify(mongoTemplate).insert(documentCaptor.capture(), eq("scan-requests"));
         Document document = documentCaptor.getValue();
         assertThat(document.get("_id")).isEqualTo("P-1|2|1");
         assertThat(document.get("payment_id")).isEqualTo("P-1");

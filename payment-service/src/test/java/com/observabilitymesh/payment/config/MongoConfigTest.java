@@ -22,13 +22,15 @@ class MongoConfigTest {
     void createsPaymentAndSecurityEventTemplates() {
         MongoConfig config = new MongoConfig();
         PaymentProperties properties = new PaymentProperties(
-                "payments", "ofac-scan-requests", "security_events_db", "payment_service",
+                "payments", "ofac", "scan-requests", "security_events_db", "payment_service",
                 "svc-payment", "Password1!", "", "", "", 200);
 
         MongoTemplate paymentTemplate = config.paymentMongoTemplate(mongoClient, "ssi_cash_activities");
+        MongoTemplate ofacTemplate = config.ofacMongoTemplate(mongoClient, properties);
         MongoTemplate securityTemplate = config.securityEventsMongoTemplate(mongoClient, properties);
 
         assertThat(paymentTemplate).isNotNull();
+        assertThat(ofacTemplate).isNotNull();
         assertThat(securityTemplate).isNotNull();
 
         MongoTransactionManager txManager = config.paymentTransactionManager(mongoDatabaseFactory);

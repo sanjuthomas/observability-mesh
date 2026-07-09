@@ -40,7 +40,7 @@ class PaymentRepositoryTest {
     @BeforeEach
     void setUp() {
         PaymentProperties properties = new PaymentProperties(
-                "payments", "ofac-scan-requests", "security_events", "payment_service",
+                "payments", "ofac", "scan-requests", "security_events", "payment_service",
                 "svc-payment", "Password1!", "", "", "", 200);
         repository = new PaymentRepository(mongoTemplate, configuredMapper(), properties);
     }

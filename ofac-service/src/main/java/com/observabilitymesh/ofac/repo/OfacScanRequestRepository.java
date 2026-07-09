@@ -4,8 +4,10 @@ import com.observabilitymesh.ofac.config.OfacProperties;
 import com.observabilitymesh.ofac.model.OfacScanLifecycleStatus;
 import com.observabilitymesh.ofac.model.OfacScanRequestConstants;
 import com.observabilitymesh.ofac.model.OfacScanRequestRef;
+import com.observabilitymesh.ofac.model.OfacScanRequestView;
 import com.observabilitymesh.ofac.model.OfacScanResult;
 import org.bson.Document;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -36,6 +38,34 @@ public class OfacScanRequestRepository {
             refs.add(toRef(document));
         }
         return refs;
+    }
+
+    public List<OfacScanRequestView> listCurrent(
+            String owningLob, String lifecycleStatus, String result, int limit) {
+        Criteria criteria = Criteria.where("out").is(OfacScanRequestConstants.CURRENT_OUT);
+        if (owningLob != null && !owningLob.isBlank()) {
+            criteria = criteria.and("owning_lob").is(owningLob);
+        }
+        if (lifecycleStatus != null && !lifecycleStatus.isBlank()) {
+            criteria = criteria.and("lifecycle_status").is(lifecycleStatus);
+        }
+        if (result != null && !result.isBlank()) {
+            criteria = criteria.and("result").is(result);
+        }
+        Query query = new Query(criteria)
+                .with(Sort.by(Sort.Direction.DESC, "requested_at"))
+                .limit(Math.min(limit, 500));
+        return mongoTemplate.find(query, Document.class, collection).stream()
+                .map(OfacScanRequestView::fromDocument)
+                .toList();
+    }
+
+    public OfacScanRequestView getCurrent(String paymentId, int paymentVersion) {
+        Document current = findCurrentDocument(paymentId, paymentVersion);
+        if (current == null) {
+            throw new OfacScanRequestNotFoundException(paymentId, paymentVersion);
+        }
+        return OfacScanRequestView.fromDocument(current);
     }
 
     @Transactional("ofacTransactionManager")

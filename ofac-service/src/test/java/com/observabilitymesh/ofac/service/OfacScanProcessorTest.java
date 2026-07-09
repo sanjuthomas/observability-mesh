@@ -39,7 +39,7 @@ class OfacScanProcessorTest {
 
     @BeforeEach
     void setUp() {
-        OfacProperties properties = new OfacProperties("ofac-scan-requests", 30_000, 0, 0);
+        OfacProperties properties = new OfacProperties("scan-requests", 30_000, 0, 0);
         processor = new OfacScanProcessor(repository, properties, Runnable::run, random, sanctionScanMetrics);
     }
 
@@ -86,7 +86,7 @@ class OfacScanProcessorTest {
 
     @Test
     void scanDelayUsesConfiguredRange() {
-        OfacProperties properties = new OfacProperties("ofac-scan-requests", 30_000, 30_000, 60_000);
+        OfacProperties properties = new OfacProperties("scan-requests", 30_000, 30_000, 60_000);
         OfacScanProcessor rangedProcessor = new OfacScanProcessor(
                 repository, properties, Runnable::run, random, sanctionScanMetrics);
         when(random.nextLong(30_001)).thenReturn(5_000L);

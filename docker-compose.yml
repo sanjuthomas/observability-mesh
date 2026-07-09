@@ -388,6 +388,7 @@ services:
       OTEL_SERVICE_NAME: payment-service
       MONGODB_URI: mongodb://mongodb:27017/?replicaSet=rs0
       MONGODB_DATABASE: ssi_cash_activities
+      OFAC_DATABASE: ofac
       AUTHORIZATION_SERVICE_URL: http://authorization-service:9094
       INSTRUCTION_SERVICE_URL: http://instruction-service:9000
       SEQUENCE_SERVICE_URL: http://sequence-service:9095
@@ -420,10 +421,10 @@ services:
     ports:
       - "9096:9096"
     environment:
-      <<: *otel-environment
+      <<: [*otel-environment, *keycloak-environment]
       OTEL_SERVICE_NAME: ofac-service
       MONGODB_URI: mongodb://mongodb:27017/?replicaSet=rs0
-      MONGODB_DATABASE: ssi_cash_activities
+      MONGODB_DATABASE: ofac
     depends_on:
       mongodb:
         condition: service_healthy

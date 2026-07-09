@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OFAC Scan Browser</title>
+    <link rel="stylesheet" href="/ui/static/styles.css?v=1" />
+    <script>
+      window.ADMIN_AUTH_STORAGE_KEY = "ofac-admin-session";
+    </script>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark"></span>
+        <div>
+          <h1>OFAC Scan Browser</h1>
+          <p class="subtitle">Admin monitor · read-only</p>
+        </div>
+      </div>
+      <div class="status-group">
+        <div class="admin-auth">
+          <span id="auth-status" class="muted">Admin sign-in required</span>
+          <input id="auth-user" type="text" value="admin-001" aria-label="Admin user" />
+          <input id="auth-password" type="password" placeholder="Password" aria-label="Password" />
+          <button type="button" id="auth-login-btn" class="btn">Sign in</button>
+          <button type="button" id="auth-logout-btn" class="btn btn-ghost hidden">Sign out</button>
+        </div>
+        <div id="load-status" class="status-pill status-connecting">Loading</div>
+        <div class="stat">
+          <span class="stat-label">Shown</span>
+          <span id="stat-total" class="stat-value">0</span>
+        </div>
+      </div>
+    </header>
+
+    <section class="toolbar">
+      <label class="filter">
+        Payment ID
+        <input
+          id="payment-filter"
+          type="text"
+          placeholder="Payment UUID"
+          spellcheck="false"
+          autocomplete="off"
+        />
+      </label>
+      <label class="filter">
+        Lifecycle
+        <select id="lifecycle-filter">
+          <option value="ALL">All</option>
+          <option value="OPEN">OPEN</option>
+          <option value="IN_PROGRESS">IN_PROGRESS</option>
+          <option value="PROCESSED">PROCESSED</option>
+        </select>
+      </label>
+      <label class="filter">
+        Result
+        <select id="result-filter">
+          <option value="ALL">All</option>
+          <option value="PASSED">PASSED</option>
+          <option value="FAILED">FAILED</option>
+          <option value="UNABLE_TO_DETERMINE">UNABLE_TO_DETERMINE</option>
+        </select>
+      </label>
+      <label class="filter">
+        Owning LOB
+        <select id="lob-filter">
+          <option value="ALL">All</option>
+        </select>
+      </label>
+      <button id="refresh-btn" type="button" class="btn">Refresh</button>
+      <button id="pause-btn" type="button" class="btn">Pause live feed</button>
+      <button id="clear-btn" type="button" class="btn btn-ghost">Clear view</button>
+    </section>
+
+    <main class="table-wrap">
+      <table id="scan-requests-table">
+        <thead>
+          <tr>
+            <th class="col-id">Payment ID</th>
+            <th>Pay Ver</th>
+            <th>Doc Ver</th>
+            <th>Lifecycle</th>
+            <th>Result</th>
+            <th class="col-id">Instruction ID</th>
+            <th>LOB</th>
+            <th>Creditor</th>
+            <th>Requested (UTC)</th>
+            <th>Valid In (UTC)</th>
+          </tr>
+        </thead>
+        <tbody id="scan-requests-body"></tbody>
+      </table>
+      <div id="empty-state" class="empty-state hidden">No OFAC scan requests found.</div>
+    </main>
+
+    <script src="/ui/static/admin-auth.js?v=1"></script>
+    <script src="/ui/static/app.js?v=1"></script>
+  </body>
+</html>

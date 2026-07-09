@@ -35,14 +35,14 @@ class OfacScanRequestRepositoryTest {
 
     @BeforeEach
     void setUp() {
-        OfacProperties properties = new OfacProperties("ofac-scan-requests", 30_000, 30_000, 60_000);
+        OfacProperties properties = new OfacProperties("scan-requests", 30_000, 30_000, 60_000);
         repository = new OfacScanRequestRepository(mongoTemplate, properties);
     }
 
     @Test
     void listOpenCurrentReturnsRefs() {
         Document open = sampleDocument("P-1", 2, 1, OfacScanLifecycleStatus.OPEN, null);
-        when(mongoTemplate.find(any(Query.class), eq(Document.class), eq("ofac-scan-requests")))
+        when(mongoTemplate.find(any(Query.class), eq(Document.class), eq("scan-requests")))
                 .thenReturn(List.of(open));
 
         List<OfacScanRequestRef> refs = repository.listOpenCurrent();
@@ -52,13 +52,47 @@ class OfacScanRequestRepositoryTest {
     }
 
     @Test
+    void listCurrentReturnsViews() {
+        Document open = sampleDocument("P-1", 2, 1, OfacScanLifecycleStatus.OPEN, null);
+        when(mongoTemplate.find(any(Query.class), eq(Document.class), eq("scan-requests")))
+                .thenReturn(List.of(open));
+
+        var views = repository.listCurrent("FICC", "OPEN", null, 100);
+
+        assertThat(views).hasSize(1);
+        assertThat(views.getFirst().paymentId()).isEqualTo("P-1");
+        assertThat(views.getFirst().lifecycleStatus()).isEqualTo("OPEN");
+    }
+
+    @Test
+    void getCurrentReturnsView() {
+        Document current = sampleDocument("P-1", 2, 1, OfacScanLifecycleStatus.OPEN, null);
+        when(mongoTemplate.findOne(any(Query.class), eq(Document.class), eq("scan-requests")))
+                .thenReturn(current);
+
+        var view = repository.getCurrent("P-1", 2);
+
+        assertThat(view.paymentId()).isEqualTo("P-1");
+        assertThat(view.paymentVersion()).isEqualTo(2);
+    }
+
+    @Test
+    void getCurrentThrowsWhenMissing() {
+        when(mongoTemplate.findOne(any(Query.class), eq(Document.class), eq("scan-requests")))
+                .thenReturn(null);
+
+        assertThatThrownBy(() -> repository.getCurrent("missing", 1))
+                .isInstanceOf(OfacScanRequestNotFoundException.class);
+    }
+
+    @Test
     void transitionClosesCurrentAndInsertsNextVersion() {
         Document current = sampleDocument("P-1", 2, 1, OfacScanLifecycleStatus.OPEN, null);
-        when(mongoTemplate.findOne(any(Query.class), eq(Document.class), eq("ofac-scan-requests")))
+        when(mongoTemplate.findOne(any(Query.class), eq(Document.class), eq("scan-requests")))
                 .thenReturn(current);
-        when(mongoTemplate.updateFirst(any(Query.class), any(Update.class), eq("ofac-scan-requests")))
+        when(mongoTemplate.updateFirst(any(Query.class), any(Update.class), eq("scan-requests")))
                 .thenReturn(com.mongodb.client.result.UpdateResult.acknowledged(1, 1L, null));
-        when(mongoTemplate.insert(any(Document.class), eq("ofac-scan-requests")))
+        when(mongoTemplate.insert(any(Document.class), eq("scan-requests")))
                 .thenAnswer(inv -> inv.getArgument(0));
 
         OfacScanRequestRef saved = repository.transition(
@@ -68,7 +102,7 @@ class OfacScanRequestRepositoryTest {
                 new OfacScanRequestRef("P-1", 2, 2, Instant.parse("2026-07-08T12:00:00Z")));
 
         ArgumentCaptor<Document> insertCaptor = ArgumentCaptor.forClass(Document.class);
-        verify(mongoTemplate).insert(insertCaptor.capture(), eq("ofac-scan-requests"));
+        verify(mongoTemplate).insert(insertCaptor.capture(), eq("scan-requests"));
         Document inserted = insertCaptor.getValue();
         assertThat(inserted.getString("_id")).isEqualTo("P-1|2|2");
         assertThat(inserted.getString("lifecycle_status")).isEqualTo("IN_PROGRESS");
@@ -79,11 +113,11 @@ class OfacScanRequestRepositoryTest {
     @Test
     void transitionWritesProcessedResult() {
         Document current = sampleDocument("P-1", 2, 2, OfacScanLifecycleStatus.IN_PROGRESS, null);
-        when(mongoTemplate.findOne(any(Query.class), eq(Document.class), eq("ofac-scan-requests")))
+        when(mongoTemplate.findOne(any(Query.class), eq(Document.class), eq("scan-requests")))
                 .thenReturn(current);
-        when(mongoTemplate.updateFirst(any(Query.class), any(Update.class), eq("ofac-scan-requests")))
+        when(mongoTemplate.updateFirst(any(Query.class), any(Update.class), eq("scan-requests")))
                 .thenReturn(com.mongodb.client.result.UpdateResult.acknowledged(1, 1L, null));
-        when(mongoTemplate.insert(any(Document.class), eq("ofac-scan-requests")))
+        when(mongoTemplate.insert(any(Document.class), eq("scan-requests")))
                 .thenAnswer(inv -> inv.getArgument(0));
 
         OfacScanRequestRef saved = repository.transition(
@@ -92,14 +126,14 @@ class OfacScanRequestRepositoryTest {
         assertThat(saved.versionNumber()).isEqualTo(3);
 
         ArgumentCaptor<Document> insertCaptor = ArgumentCaptor.forClass(Document.class);
-        verify(mongoTemplate).insert(insertCaptor.capture(), eq("ofac-scan-requests"));
+        verify(mongoTemplate).insert(insertCaptor.capture(), eq("scan-requests"));
         assertThat(insertCaptor.getValue().getString("lifecycle_status")).isEqualTo("PROCESSED");
         assertThat(insertCaptor.getValue().getString("result")).isEqualTo("PASSED");
     }
 
     @Test
     void transitionThrowsWhenCurrentMissing() {
-        when(mongoTemplate.findOne(any(Query.class), eq(Document.class), eq("ofac-scan-requests")))
+        when(mongoTemplate.findOne(any(Query.class), eq(Document.class), eq("scan-requests")))
                 .thenReturn(null);
 
         assertThatThrownBy(() -> repository.transition(
@@ -110,7 +144,7 @@ class OfacScanRequestRepositoryTest {
     @Test
     void transitionThrowsOnVersionMismatch() {
         Document current = sampleDocument("P-1", 2, 2, OfacScanLifecycleStatus.IN_PROGRESS, null);
-        when(mongoTemplate.findOne(any(Query.class), eq(Document.class), eq("ofac-scan-requests")))
+        when(mongoTemplate.findOne(any(Query.class), eq(Document.class), eq("scan-requests")))
                 .thenReturn(current);
 
         assertThatThrownBy(() -> repository.transition(
@@ -121,9 +155,9 @@ class OfacScanRequestRepositoryTest {
     @Test
     void transitionThrowsOnCloseRace() {
         Document current = sampleDocument("P-1", 2, 1, OfacScanLifecycleStatus.OPEN, null);
-        when(mongoTemplate.findOne(any(Query.class), eq(Document.class), eq("ofac-scan-requests")))
+        when(mongoTemplate.findOne(any(Query.class), eq(Document.class), eq("scan-requests")))
                 .thenReturn(current);
-        when(mongoTemplate.updateFirst(any(Query.class), any(Update.class), eq("ofac-scan-requests")))
+        when(mongoTemplate.updateFirst(any(Query.class), any(Update.class), eq("scan-requests")))
                 .thenReturn(com.mongodb.client.result.UpdateResult.acknowledged(0, 0L, null));
 
         assertThatThrownBy(() -> repository.transition(

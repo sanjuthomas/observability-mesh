@@ -58,7 +58,7 @@ docker compose up -d                    # full stack
 | http://localhost:9000/ui/ | Instruction browser |
 | http://localhost:9093/ui/ | Payment browser |
 | http://localhost:9090/ui/ | SLO author service (OpenSLO authoring) |
-| http://localhost:9096/actuator/health | OFAC scan simulator |
+| http://localhost:9096/ui/ | OFAC scan browser |
 | http://localhost:9097/actuator/health | SLO provisioner (OpenSLO → Sloth) |
 | http://localhost:9094/ui/ | Authorization user directory |
 | http://localhost:9091 | Demo harness |

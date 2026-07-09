@@ -21,7 +21,7 @@ class MongoConfigTest {
     void createsMongoTemplateAndTransactionManager() {
         MongoConfig config = new MongoConfig();
 
-        MongoTemplate template = config.ofacMongoTemplate(mongoClient, "ssi_cash_activities");
+        MongoTemplate template = config.ofacMongoTemplate(mongoClient, "ofac");
         MongoTransactionManager txManager = config.ofacTransactionManager(mongoDatabaseFactory);
 
         assertThat(template).isNotNull();

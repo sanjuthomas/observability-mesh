@@ -53,7 +53,7 @@ class PaymentServiceBranchesTest {
     @BeforeEach
     void setUp() {
         PaymentProperties properties = new PaymentProperties(
-                "payments", "ofac-scan-requests", "security_events", "payment_service",
+                "payments", "ofac", "scan-requests", "security_events", "payment_service",
                 "svc-payment", "Password1!", "COMPLIANCE_ANALYST", "admin-001", "", 200);
         paymentService = PaymentServiceTestFixtures.paymentService(
                 repository, securityEventRepository, ofacScanRequestRepository, authzClient, instructionClient,

@@ -9,7 +9,8 @@ import java.util.stream.Collectors;
 @ConfigurationProperties(prefix = "observability-mesh.payment")
 public record PaymentProperties(
         String collection,
-        String ofacScanRequestsCollection,
+        String ofacDatabase,
+        String scanRequestsCollection,
         String securityEventsDatabase,
         String securityEventsCollection,
         String serviceUserId,

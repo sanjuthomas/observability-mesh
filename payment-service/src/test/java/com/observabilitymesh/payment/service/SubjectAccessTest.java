@@ -14,7 +14,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class SubjectAccessTest {
 
     private static final PaymentProperties PROPERTIES = new PaymentProperties(
-            "payments", "ofac-scan-requests", "security_events", "payment_service",
+            "payments", "ofac", "scan-requests", "security_events", "payment_service",
             "svc-payment", "Password1!",
             "COMPLIANCE_ANALYST,COMPLIANCE_OFFICER,PLATFORM_ADMIN",
             "", "admin-001", 200);

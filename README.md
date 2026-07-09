@@ -14,7 +14,7 @@ At the other end of the spectrum, a small company wants reliable operations with
 
 This repo is my answer: a **service reliability catalog** assembled from open-source and free tools, wired together so you can run a small application with a full observability stack — the same way data mesh thinking lets teams own their data products without waiting on a central warehouse team. Call it an **observability mesh**: each service exports OTLP, the catalog provides the shared backends (Prometheus, Tempo, Grafana, OpenSearch), and OpenSLO gives you a portable way to define what “good” looks like before you outgrow the setup.
 
-The Java microservices here are a **demo workload** to prove the catalog works end-to-end. You can swap them for your own services and keep the mesh. The demo app uses MongoDB; the **SLO catalog** (`slo-author-service` + `slo-provisioner-service`) uses **PostgreSQL** so the mesh path stays on fully OSI-open-source storage.
+The Java microservices here are a **demo workload** to prove the catalog works end-to-end. You can swap them for your own services and keep the mesh. The demo app uses MongoDB (`ssi_cash_activities` for instructions and payments, `ofac` for sanction scan requests, `security_events` for audit events); the **SLO catalog** (`slo-author-service` + `slo-provisioner-service`) uses **PostgreSQL** so the mesh path stays on fully OSI-open-source storage.
 
 ## Who this is for
 
@@ -31,12 +31,14 @@ flowchart LR
     User[Browser / Harness] --> Keycloak[Keycloak OIDC]
     User --> Inst[instruction-service]
     User --> Pay[payment-service]
+    User --> Ofac[ofac-service]
     Inst --> Authz[authorization-service]
     Pay --> Authz
     Authz --> OPA[OPA]
     Inst --> Mongo[(MongoDB)]
     Pay --> Mongo
-    OFAC[ofac-service] --> Mongo
+    Pay -.->|scan-requests| OfacDb[(ofac DB)]
+    Ofac --> OfacDb
     Seq[sequence-service] --> Mongo
     Inst --> Seq
     Pay --> Seq
@@ -44,7 +46,7 @@ flowchart LR
 
 OpenSLO authoring (`slo-author-service`) and SLO provisioning (`slo-provisioner-service`) are part of the stack but omitted here; see **OpenSLO → Sloth → Prometheus** under Observability for that path.
 
-**In scope:** instruction, payment, authorization, sequence, OFAC (sanction scan simulator), SLO author, and SLO provisioner services; demo harness; per-service browser UIs; OPA policies; Keycloak seed; metrics and trace visualization.
+**In scope:** instruction, payment, authorization, sequence, and OFAC services; SLO author and SLO provisioner; demo harness; per-service browser UIs (instructions, payments, OFAC scans, authorization directory, OpenSLO authoring); OPA policies; Keycloak seed; metrics and trace visualization.
 
 **Out of scope (by design):** Kafka, Neo4j, indexer, chat/RAG.
 
@@ -152,7 +154,7 @@ Part of the demo workload: when a payment is **approved**, `payment-service` wri
 
 1. the new bitemporal payment version (`payments`),
 2. a security event (`payment_service` in the `security_events` DB), and
-3. an OFAC scan request (`ofac-scan-requests`) capturing payment id, owning LOB, debtor/creditor accounts, creditor name, and intermediaries.
+3. an OFAC scan request (`scan-requests` in the `ofac` database) capturing payment id, owning LOB, debtor/creditor accounts, creditor name, and intermediaries.
 
 `ofac-service` is a **fake sanction scanner** that simulates the vendor software large banks license rather than build (keeping pace with OFAC/Washington rule changes and the associated liability is hard). It runs a batch poll every **30 seconds**:
 
@@ -169,6 +171,8 @@ v1 OPEN  →  v2 IN_PROGRESS  →  v3 PROCESSED (PASSED | FAILED)
 
 When a scan reaches `PROCESSED`, `ofac-service` increments `sanction_scan_completed_total` (Micrometer → OTLP → Prometheus) with a `result` label (`PASSED`, `FAILED`, or `UNABLE_TO_DETERMINE`). Definitive scans completed within 60 seconds of `requested_at` also carry `duration_le="60s"`, matching the seeded OpenSLO SLIs. The simulator returns `UNABLE_TO_DETERMINE` on roughly 1% of completions.
 
+**OFAC scan browser** — http://localhost:9096/ui/ is a read-only admin UI (Keycloak JWT, `PLATFORM_ADMIN` role) that lists current scan requests from the `ofac` database with live polling. Filter by lifecycle status, result, or owning LOB; open a payment’s scan detail from the table. Sign in with **`admin-001`** / **`Password1!`** like the other service browsers.
+
 ## Stack
 
 | Layer | Technology |
@@ -178,7 +182,7 @@ When a scan reaches `PROCESSED`, `ofac-service` increments `sanction_scan_comple
 | Build | Maven Wrapper (`./mvnw`) |
 | Identity | Keycloak (OIDC) |
 | Policy | OPA (Rego) |
-| Demo app data | MongoDB replica set |
+| Demo app data | MongoDB replica set (`ssi_cash_activities`, `ofac`, `security_events`) |
 | SLO catalog | PostgreSQL (`open_slo`) |
 | SLO authoring | `slo-author-service` (OpenSLO v1 + [open-slo-java-sdk](https://github.com/sanjuthomas/open-slo-java-sdk)) |
 | SLO provisioning | [Sloth](https://github.com/slok/sloth) → Prometheus recording rules |
@@ -224,13 +228,13 @@ If another Docker stack already uses names like `mongodb`, `postgres`, or `opens
 
 ## Service URLs
 
-Demo Keycloak users (instruction, payment, authorization, harness, and SLO authoring UIs) share password **`Password1!`** — any `user_id` from [keycloak-seed/users.yaml](keycloak-seed/users.yaml) works. Platform operator default: **`admin-001`**.
+Demo Keycloak users (instruction, payment, OFAC, authorization, harness, and SLO authoring UIs) share password **`Password1!`** — any `user_id` from [keycloak-seed/users.yaml](keycloak-seed/users.yaml) works. Platform operator default: **`admin-001`**.
 
 | URL | Service | Username | Password |
 |-----|---------|----------|----------|
 | http://localhost:9000/ui/ | Instruction browser | `admin-001` | `Password1!` |
 | http://localhost:9093/ui/ | Payment browser | `admin-001` | `Password1!` |
-| http://localhost:9096/actuator/health | OFAC scan simulator (batch processor) | — | — |
+| http://localhost:9096/ui/ | OFAC scan browser | `admin-001` | `Password1!` |
 | http://localhost:9097/actuator/health | SLO provisioner (OpenSLO → Sloth batch) | — | — |
 | http://localhost:9094/ui/ | Authorization user directory | `admin-001` | `Password1!` |
 | http://localhost:9091 | Demo harness | `admin-001` | `Password1!` |
@@ -249,6 +253,7 @@ Services marked **—** have no authentication in the demo compose stack (public
 ```bash
 ./mvnw verify                    # tests + JaCoCo gate
 ./mvnw -pl instruction-service spring-boot:run
+./mvnw -pl ofac-service spring-boot:run   # OFAC batch processor + scan browser on :9096
 ```
 
 Run backing infrastructure and peer services:
@@ -256,7 +261,8 @@ Run backing infrastructure and peer services:
 ```bash
 docker compose up -d mongodb mongo-init postgres opa opa-policy-seed keycloak keycloak-seed \
   otel-collector opensearch opensearch-dashboards prometheus tempo grafana \
-  sequence-service authorization-service slo-author-service
+  sequence-service authorization-service instruction-service payment-service ofac-service \
+  slo-author-service
 ```
 
 Point a locally running service at the collector with `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317`.
@@ -268,7 +274,7 @@ Point a locally running service at the collector with `OTEL_EXPORTER_OTLP_ENDPOI
 ├── shared/                  # Common libraries (auth, authz client, telemetry, …)
 ├── instruction-service/
 ├── payment-service/
-├── ofac-service/            # Sanction scan simulator (batch processor)
+├── ofac-service/            # Sanction scan simulator + scan browser UI (`ofac` DB)
 ├── slo-author-service/      # OpenSLO authoring UI + API (Keycloak OIDC)
 ├── slo-provisioner-service/ # OpenSLO → Sloth → Prometheus rules batch
 ├── authorization-service/

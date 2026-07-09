@@ -28,6 +28,11 @@ public class MongoConfig {
     }
 
     @Bean
+    MongoTemplate ofacMongoTemplate(MongoClient mongoClient, PaymentProperties properties) {
+        return new MongoTemplate(mongoClient, properties.ofacDatabase());
+    }
+
+    @Bean
     MongoTemplate securityEventsMongoTemplate(
             MongoClient mongoClient,
             PaymentProperties properties) {

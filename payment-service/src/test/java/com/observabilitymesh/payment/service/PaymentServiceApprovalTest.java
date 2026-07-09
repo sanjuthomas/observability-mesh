@@ -58,7 +58,7 @@ class PaymentServiceApprovalTest {
     @BeforeEach
     void setUp() {
         PaymentProperties properties = new PaymentProperties(
-                "payments", "ofac-scan-requests", "security_events", "payment_service",
+                "payments", "ofac", "scan-requests", "security_events", "payment_service",
                 "svc-payment", "Password1!", "", "", "", 200);
         paymentService = PaymentServiceTestFixtures.paymentService(
                 repository, securityEventRepository, ofacScanRequestRepository, authzClient, instructionClient,

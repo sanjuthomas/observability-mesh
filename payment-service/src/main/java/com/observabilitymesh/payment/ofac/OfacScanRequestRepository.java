@@ -13,12 +13,12 @@ public class OfacScanRequestRepository {
     private final String collection;
 
     public OfacScanRequestRepository(
-            MongoTemplate paymentMongoTemplate,
+            MongoTemplate ofacMongoTemplate,
             ObjectMapper paymentObjectMapper,
             com.observabilitymesh.payment.config.PaymentProperties properties) {
-        this.mongoTemplate = paymentMongoTemplate;
+        this.mongoTemplate = ofacMongoTemplate;
         this.objectMapper = paymentObjectMapper;
-        this.collection = properties.ofacScanRequestsCollection();
+        this.collection = properties.scanRequestsCollection();
     }
 
     public void insert(OfacScanRequest request) {

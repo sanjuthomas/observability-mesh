@@ -16,7 +16,7 @@ class ServiceIdentityRetryTest {
 
     private PaymentProperties properties() {
         return new PaymentProperties(
-                "payments", "ofac-scan-requests", "security_events", "payment_service",
+                "payments", "ofac", "scan-requests", "security_events", "payment_service",
                 "svc-payment", "Password1!", "", "", "", 200);
     }
 
