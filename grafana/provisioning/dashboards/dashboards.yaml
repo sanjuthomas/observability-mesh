@@ -1,0 +1,12 @@
+apiVersion: 1
+
+providers:
+  - name: observability-mesh
+    orgId: 1
+    folder: SLOs
+    type: file
+    disableDeletion: false
+    editable: true
+    updateIntervalSeconds: 30
+    options:
+      path: /etc/grafana/dashboards

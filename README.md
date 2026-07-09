@@ -4,7 +4,7 @@ Reference stack for **observability sovereignty without enterprise licensing** �
 
 The policy-aware SSI microservices platform is the **demo workload**: a trimmed Java port of [policy-pilot](https://github.com/sanjuthomas/policy-pilot) that exercises the catalog end-to-end. It generates realistic telemetry and business events (including sanction-scan latency) so you can see how the pieces fit together without building a production payments system first.
 
-OpenSLO documents are authored in `slo-author-service` (a Keycloak-secured Spring Boot service and browser UI in this monorepo). `slo-provisioner-service` compiles active SLOs through [Sloth](https://github.com/slok/sloth) into Prometheus recording rules for Grafana SLO dashboards (import [dashboard 14348](https://grafana.com/grafana/dashboards/14348-sloth-slo/) in Grafana OSS) and exposes a read-only browser UI for provision status and generated rules.
+OpenSLO documents are authored in `slo-author-service` (a Keycloak-secured Spring Boot service and browser UI in this monorepo). `slo-provisioner-service` compiles active SLOs through [Sloth](https://github.com/slok/sloth) into Prometheus recording rules for Grafana SLO dashboards (based on [Sloth dashboard 14348](https://grafana.com/grafana/dashboards/14348-sloth-slo/), provisioned automatically under **SLOs → SLO Overview (Sloth)**) and exposes a read-only browser UI for provision status and generated rules.
 
 ## Why I built this
 
@@ -92,14 +92,15 @@ Docker Compose sets a shared OTLP endpoint and per-service `OTEL_SERVICE_NAME`. 
 | **Metrics** | OTLP | `metrics` → Prometheus exporter `:8889` | Prometheus TSDB | Grafana → Explore → Prometheus |
 | **Traces** | OTLP | `traces` → Tempo | Tempo local storage | Grafana → Explore → Tempo |
 
-Grafana at http://localhost:3000 is pre-provisioned with Prometheus and Tempo datasources.
+Grafana at http://localhost:3000 is pre-provisioned with Prometheus and Tempo datasources, plus the **SLO Overview (Sloth)** dashboard under the **SLOs** folder.
 
 ### Try it
 
 1. Start the stack and seed demo data: `./scripts/seed-demo-data.sh`
-2. Open Grafana → **Explore** → **Prometheus** — e.g. `rate(http_server_requests_seconds_count{service_name="instruction-service"}[5m])`
-3. Open Grafana → **Explore** → **Tempo** — search by `service.name` (e.g. `instruction-service`)
-4. For logs, use OpenSearch Dashboards (index pattern `otel-logs*`)
+2. Open Grafana → **Dashboards** → **SLOs** → **SLO Overview (Sloth)** — select service `payment-platform` to view sanction-scan SLO burn rate and error budget
+3. Open Grafana → **Explore** → **Prometheus** — e.g. `rate(http_server_requests_seconds_count{service_name="instruction-service"}[5m])`
+4. Open Grafana → **Explore** → **Tempo** — search by `service.name` (e.g. `instruction-service`)
+5. For logs, use OpenSearch Dashboards (index pattern `otel-logs*`)
 
 `demo-harness` is not on the shared telemetry module yet.
 
@@ -123,7 +124,7 @@ flowchart LR
 
     subgraph Metrics[Prometheus & Grafana]
         direction TB        
-        Grafana[Grafana + Sloth dashboard 14348]
+        Grafana[Grafana + SLO Overview dashboard]
         Prom[Prometheus]
         Rules[(tenant rules volume)]
     end
@@ -288,7 +289,7 @@ Point a locally running service at the collector with `OTEL_EXPORTER_OTLP_ENDPOI
 ├── postgres/                # PostgreSQL init for SLO catalog (open_slo)
 ├── prometheus/              # Prometheus scrape config (otel-collector metrics)
 ├── tempo/                   # Tempo trace storage config
-├── grafana/                 # Grafana datasource provisioning
+├── grafana/                 # Grafana datasource + SLO dashboard provisioning
 ├── otel-collector-config.yaml
 ├── docker-compose.yml
 └── scripts/seed-demo-data.sh
