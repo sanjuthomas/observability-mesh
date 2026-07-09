@@ -224,21 +224,25 @@ If another Docker stack already uses names like `mongodb`, `postgres`, or `opens
 
 ## Service URLs
 
-| URL | Service |
-|-----|---------|
-| http://localhost:9000/ui/ | Instruction browser |
-| http://localhost:9093/ui/ | Payment browser |
-| http://localhost:9096/actuator/health | OFAC scan simulator (batch processor) |
-| http://localhost:9097/actuator/health | SLO provisioner (OpenSLO → Sloth batch) |
-| http://localhost:9094/ui/ | Authorization user directory |
-| http://localhost:9091 | Demo harness |
-| http://localhost:9090/ui/ | SLO authoring service (`admin-001` / `Password1!`) |
-| http://localhost:9080 | Keycloak admin (`admin` / `admin`) |
-| http://localhost:3000 | Grafana (`admin` / `admin`) — metrics & traces |
-| http://localhost:9092 | Prometheus UI |
-| http://localhost:3200 | Tempo API |
-| http://localhost:5601 | OpenSearch Dashboards — logs |
-| http://localhost:9181 | OPA |
+Demo Keycloak users (instruction, payment, authorization, harness, and SLO authoring UIs) share password **`Password1!`** — any `user_id` from [keycloak-seed/users.yaml](keycloak-seed/users.yaml) works. Platform operator default: **`admin-001`**.
+
+| URL | Service | Username | Password |
+|-----|---------|----------|----------|
+| http://localhost:9000/ui/ | Instruction browser | `admin-001` | `Password1!` |
+| http://localhost:9093/ui/ | Payment browser | `admin-001` | `Password1!` |
+| http://localhost:9096/actuator/health | OFAC scan simulator (batch processor) | — | — |
+| http://localhost:9097/actuator/health | SLO provisioner (OpenSLO → Sloth batch) | — | — |
+| http://localhost:9094/ui/ | Authorization user directory | `admin-001` | `Password1!` |
+| http://localhost:9091 | Demo harness | `admin-001` | `Password1!` |
+| http://localhost:9090/ui/ | SLO authoring service | `admin-001` | `Password1!` |
+| http://localhost:9080 | Keycloak admin console | `admin` | `admin` |
+| http://localhost:3000 | Grafana — metrics & traces | `admin` | `admin` |
+| http://localhost:9092 | Prometheus UI | — | — |
+| http://localhost:3200 | Tempo API | — | — |
+| http://localhost:5601 | OpenSearch Dashboards — logs | — | — |
+| http://localhost:9181 | OPA | — | — |
+
+Services marked **—** have no authentication in the demo compose stack (public health endpoints, observability backends, or OPA API).
 
 ## Development
 

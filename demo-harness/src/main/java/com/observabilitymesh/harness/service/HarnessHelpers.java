@@ -117,9 +117,7 @@ public class HarnessHelpers {
 
     public SessionCredentials sessionForUser(SeedFile seed, String userId) {
         String password = seed.defaults().getOrDefault("password", properties.defaultPassword());
-        String domain = seed.defaults().getOrDefault("email_domain", properties.emailDomain());
-        String loginName = userId + "@" + domain;
-        KeycloakLoginClient.LoginResponse response = loginClient.login(loginName, password);
+        KeycloakLoginClient.LoginResponse response = loginClient.login(userId, password);
         return new SessionCredentials(
                 response.sessionId() == null ? "" : response.sessionId(),
                 response.sessionToken());

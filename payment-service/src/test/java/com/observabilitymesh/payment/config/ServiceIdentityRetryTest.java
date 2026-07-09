@@ -14,12 +14,15 @@ class ServiceIdentityRetryTest {
 
     @Mock KeycloakLoginClient loginClient;
 
-    @Test
-    void loginRetriesUntilSuccess() {
-        PaymentProperties properties = new PaymentProperties(
+    private PaymentProperties properties() {
+        return new PaymentProperties(
                 "payments", "ofac-scan-requests", "security_events", "payment_service",
                 "svc-payment", "Password1!", "", "", "", 200);
-        ServiceIdentity identity = new ServiceIdentity(loginClient, properties);
+    }
+
+    @Test
+    void loginRetriesUntilSuccess() {
+        ServiceIdentity identity = new ServiceIdentity(loginClient, properties());
         when(loginClient.login("svc-payment", "Password1!"))
                 .thenThrow(new IllegalArgumentException("not ready"))
                 .thenReturn(new KeycloakLoginClient.LoginResponse("svc-payment", "token-2", "sess-2"));
@@ -30,13 +33,22 @@ class ServiceIdentityRetryTest {
 
     @Test
     void ensureLoggedInTriggersLoginWhenMissing() {
-        PaymentProperties properties = new PaymentProperties(
-                "payments", "ofac-scan-requests", "security_events", "payment_service",
-                "svc-payment", "Password1!", "", "", "", 200);
-        ServiceIdentity identity = new ServiceIdentity(loginClient, properties);
+        ServiceIdentity identity = new ServiceIdentity(loginClient, properties());
         when(loginClient.login("svc-payment", "Password1!"))
                 .thenReturn(new KeycloakLoginClient.LoginResponse("svc-payment", "token-3", "sess-3"));
         identity.ensureLoggedIn();
         assertThat(identity.token()).isEqualTo("token-3");
+    }
+
+    @Test
+    void ensureLoggedInRefreshesExpiredToken() {
+        ServiceIdentity identity = new ServiceIdentity(loginClient, properties());
+        when(loginClient.login("svc-payment", "Password1!"))
+                .thenReturn(new KeycloakLoginClient.LoginResponse("svc-payment", "token-1", "sess-1"))
+                .thenReturn(new KeycloakLoginClient.LoginResponse("svc-payment", "token-2", "sess-2"));
+        identity.ensureLoggedIn();
+        identity.expireTokenForTest();
+        identity.ensureLoggedIn();
+        assertThat(identity.token()).isEqualTo("token-2");
     }
 }

@@ -185,6 +185,6 @@ class OpaClientTest {
     }
 
     private static String dataUrl(String packagePath) {
-        return "http://localhost/v1/data/" + packagePath.replace("/", "%2F");
+        return "http://localhost/v1/data/" + packagePath;
     }
 }

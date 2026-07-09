@@ -58,9 +58,9 @@ class HarnessHelpersTest {
     }
 
     @Test
-    void sessionForUserUsesEmailLogin() {
-        when(loginClient.login("mo-100@ssi.local", "Password1!"))
-                .thenReturn(new KeycloakLoginClient.LoginResponse("mo-100@ssi.local", "token", "sess"));
+    void sessionForUserUsesKeycloakUsername() {
+        when(loginClient.login("mo-100", "Password1!"))
+                .thenReturn(new KeycloakLoginClient.LoginResponse("mo-100", "token", "sess"));
 
         SessionCredentials session = helpers.sessionForUser(HarnessTestFixtures.SAMPLE_SEED, "mo-100");
 
@@ -292,8 +292,8 @@ class HarnessHelpersTest {
 
     @Test
     void sessionForUserUsesEmptySessionIdWhenMissing() {
-        when(loginClient.login("mo-100@ssi.local", "Password1!"))
-                .thenReturn(new KeycloakLoginClient.LoginResponse("mo-100@ssi.local", "token", null));
+        when(loginClient.login("mo-100", "Password1!"))
+                .thenReturn(new KeycloakLoginClient.LoginResponse("mo-100", "token", null));
 
         SessionCredentials session = helpers.sessionForUser(HarnessTestFixtures.SAMPLE_SEED, "mo-100");
 

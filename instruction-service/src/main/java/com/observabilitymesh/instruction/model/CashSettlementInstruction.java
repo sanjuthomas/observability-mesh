@@ -123,8 +123,8 @@ public class CashSettlementInstruction {
         map.put("status", status.name());
         map.put("type", instructionType.name());
         map.put("owning_lob", owningLob);
-        map.put("effective_date", effectiveDate == null ? "" : effectiveDate + "Z");
-        map.put("end_date", endDate == null ? "" : endDate + "Z");
+        map.put("effective_date", effectiveDate == null ? "" : effectiveDate.toString());
+        map.put("end_date", endDate == null ? "" : endDate.toString());
         map.put("created_by", createdByMap);
         map.put("suspended_by", suspendedBy);
         map.put("used_by", usedBy);

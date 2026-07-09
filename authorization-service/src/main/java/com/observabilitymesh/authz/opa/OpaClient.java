@@ -169,12 +169,17 @@ public class OpaClient {
 
     private Object postData(String path, Map<String, Object> payload) {
         OpaDataResponse body = restClient.post()
-                .uri("/v1/data/{path}", path)
+                .uri(dataPath(path))
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(payload)
                 .retrieve()
                 .body(OpaDataResponse.class);
         return body == null ? null : body.result();
+    }
+
+    /** OPA data paths contain slashes; must not be passed as a URI template variable. */
+    private static String dataPath(String path) {
+        return "/v1/data/" + path;
     }
 
     private static List<String> asStringList(Object value) {

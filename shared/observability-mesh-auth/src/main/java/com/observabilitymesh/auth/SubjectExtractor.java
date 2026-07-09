@@ -51,7 +51,7 @@ public class SubjectExtractor {
         if (value instanceof String raw) {
             if (raw.startsWith("[")) {
                 try {
-                    return objectMapper.readValue(raw, new TypeReference<>() {});
+                    return objectMapper.readValue(raw, new TypeReference<List<String>>() {});
                 } catch (Exception ignored) {
                     return List.of(raw);
                 }
@@ -98,7 +98,7 @@ public class SubjectExtractor {
         if (value instanceof String raw) {
             if (raw.startsWith("[")) {
                 try {
-                    return objectMapper.readValue(raw, new TypeReference<>() {});
+                    return objectMapper.readValue(raw, new TypeReference<List<String>>() {});
                 } catch (Exception ignored) {
                     return List.of(raw);
                 }

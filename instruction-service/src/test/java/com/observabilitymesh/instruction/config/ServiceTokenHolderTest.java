@@ -33,4 +33,16 @@ class ServiceTokenHolderTest {
         holder.ensureLoggedIn();
         assertThat(holder.token()).isNotNull();
     }
+
+    @Test
+    void ensureLoggedInRefreshesExpiredToken() {
+        when(loginClient.login("svc-instruction", "Password1!"))
+                .thenReturn(new KeycloakLoginClient.LoginResponse("svc-instruction", "token-1", "sess-1"))
+                .thenReturn(new KeycloakLoginClient.LoginResponse("svc-instruction", "token-2", "sess-2"));
+        ServiceTokenHolder holder = new ServiceTokenHolder(loginClient, InstructionTestFixtures.properties());
+        holder.ensureLoggedIn();
+        holder.expireTokenForTest();
+        holder.ensureLoggedIn();
+        assertThat(holder.token()).isEqualTo("token-2");
+    }
 }

@@ -3,6 +3,7 @@ package com.observabilitymesh.instruction.model;
 import com.observabilitymesh.instruction.InstructionTestFixtures;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -27,8 +28,14 @@ class CashSettlementInstructionTest {
     }
 
     @Test
-    void toOpaAccountReturnsFundingLob() {
-        assertThat(InstructionTestFixtures.sampleInstruction("I-1").toOpaAccount())
-                .containsEntry("owning_lob", "FICC");
+    void toOpaInstructionUsesRfc3339DatesWithoutDoubleZuluSuffix() {
+        CashSettlementInstruction instruction = InstructionTestFixtures.sampleInstruction("I-1");
+        instruction.setEffectiveDate(Instant.parse("2026-07-09T00:00:00Z"));
+        instruction.setEndDate(Instant.parse("2027-07-09T00:00:00Z"));
+
+        Map<String, Object> opa = instruction.toOpaInstruction();
+
+        assertThat(opa.get("effective_date")).isEqualTo("2026-07-09T00:00:00Z");
+        assertThat(opa.get("end_date")).isEqualTo("2027-07-09T00:00:00Z");
     }
 }
