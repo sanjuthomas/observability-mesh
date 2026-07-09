@@ -1,0 +1,326 @@
+name: payment-ofac-demo
+
+include:
+  - path: ../../platform/docker-compose.yml
+
+x-otel-environment: &otel-environment
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+  OTEL_EXPORTER_OTLP_METRICS_URL: http://otel-collector:4318/v1/metrics
+  OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+  OTEL_EXPORTER_OTLP_INSECURE: "true"
+  OTEL_METRIC_EXPORT_STEP: 15s
+  OTEL_LOG_CONSOLE: "true"
+  OTEL_DEPLOYMENT_ENVIRONMENT: development
+  OTEL_METRIC_EXPORT_INTERVAL: "15000"
+  OTEL_INSTRUMENTATION_MONGO_ENABLED: "false"
+  OTEL_INSTRUMENTATION_SPRING_WEB_ENABLED: "false"
+
+x-keycloak-environment: &keycloak-environment
+  OIDC_ISSUER_URL: http://localhost:9080/realms/observability-mesh
+  OIDC_JWK_SET_URI: http://keycloak:9080/realms/observability-mesh/protocol/openid-connect/certs
+  KEYCLOAK_TOKEN_URL: http://keycloak:9080/realms/observability-mesh/protocol/openid-connect/token
+  KEYCLOAK_CLIENT_ID: observability-mesh-ui
+  KEYCLOAK_CLIENT_SECRET: ""
+
+services:
+  slo-provisioner-service:
+    environment:
+      OBSERVABILITY_MESH_SLO_PROVISIONER_DATASOURCE_NAMES: payment-prometheus
+
+  postgres:
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ../../postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./postgres/seed-slos.sql:/docker-entrypoint-initdb.d/02-seed-slos.sql:ro
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0.7
+    container_name: keycloak
+    command: start-dev --import-realm
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HTTP_PORT: 9080
+      KC_HOSTNAME: localhost
+      KC_HOSTNAME_PORT: 9080
+      KC_HOSTNAME_STRICT: "false"
+      KC_HOSTNAME_STRICT_HTTPS: "false"
+      KC_HTTP_ENABLED: "true"
+    volumes:
+      - ./oidc/keycloak-seed/realm-observability-mesh.json:/opt/keycloak/data/import/realm-observability-mesh.json:ro
+    ports:
+      - "9080:9080"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "exec 3<>/dev/tcp/127.0.0.1/9080; echo -e 'GET /realms/observability-mesh/.well-known/openid-configuration HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3; cat <&3 | grep -q 200",
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 18
+      start_period: 40s
+    restart: unless-stopped
+    networks:
+      - observability-mesh-net
+
+  keycloak-seed:
+    build: ./oidc/keycloak-seed
+    container_name: keycloak-seed
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    environment:
+      KEYCLOAK_URL: http://keycloak:9080
+      KEYCLOAK_REALM: observability-mesh
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    restart: "no"
+    networks:
+      - observability-mesh-net
+
+  opa:
+    image: openpolicyagent/opa:1.17.1
+    container_name: opa-server
+    ports:
+      - "9181:9181"
+    command:
+      - run
+      - --server
+      - --addr
+      - :9181
+      - --log-level
+      - info
+      - /policies
+    volumes:
+      - ./opa-policy-seed/policies:/policies:ro
+    restart: unless-stopped
+    networks:
+      - observability-mesh-net
+
+  opa-policy-seed:
+    build: ./opa-policy-seed
+    container_name: opa-policy-seed
+    depends_on:
+      - opa
+    environment:
+      OPA_URL: http://opa:9181
+      POLICIES_DIR: /policies
+    volumes:
+      - ./opa-policy-seed/policies:/policies:ro
+    restart: "no"
+    networks:
+      - observability-mesh-net
+
+  mongodb:
+    image: mongo:7
+    container_name: mongodb
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - observability-mesh-net
+
+  mongo-init:
+    image: mongo:7
+    container_name: mongo-init
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    restart: "no"
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        mongosh --host mongodb:27017 --quiet --eval '
+          try {
+            const status = rs.status();
+            if (status.ok !== 1) throw new Error("not ready");
+            quit(0);
+          } catch (e) {
+            rs.initiate({_id: "rs0", members: [{_id: 0, host: "mongodb:27017"}]});
+          }
+        '
+        until mongosh --host mongodb:27017 --quiet --eval 'rs.isMaster().ismaster' | grep -q true; do
+          sleep 1
+        done
+    networks:
+      - observability-mesh-net
+
+  sequence-service:
+    build:
+      context: ../..
+      dockerfile: workloads/payment-ofac-demo/sequence-service/Dockerfile
+    container_name: sequence-service
+    ports:
+      - "9095:9095"
+    environment:
+      <<: *otel-environment
+      OTEL_SERVICE_NAME: sequence-service
+      MONGODB_URI: mongodb://mongodb:27017/?replicaSet=rs0
+      MONGODB_DATABASE: ssi_sequences
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      mongo-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    networks:
+      - observability-mesh-net
+
+  authorization-service:
+    build:
+      context: ../..
+      dockerfile: workloads/payment-ofac-demo/authorization-service/Dockerfile
+    container_name: authorization-service
+    ports:
+      - "9094:9094"
+    environment:
+      <<: [*otel-environment, *keycloak-environment]
+      OTEL_SERVICE_NAME: authorization-service
+      OPA_URL: http://opa:9181
+      USERS_FILE: /app/keycloak-seed/users.yaml
+    volumes:
+      - ./oidc/keycloak-seed:/app/keycloak-seed:ro
+    depends_on:
+      opa-policy-seed:
+        condition: service_completed_successfully
+      keycloak-seed:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    networks:
+      - observability-mesh-net
+
+  instruction-service:
+    build:
+      context: ../..
+      dockerfile: workloads/payment-ofac-demo/instruction-service/Dockerfile
+    container_name: instruction-service
+    ports:
+      - "9000:9000"
+    environment:
+      <<: [*otel-environment, *keycloak-environment]
+      OTEL_SERVICE_NAME: instruction-service
+      MONGODB_URI: mongodb://mongodb:27017/?replicaSet=rs0
+      MONGODB_DATABASE: ssi_cash_instructions
+      AUTHORIZATION_SERVICE_URL: http://authorization-service:9094
+      SEQUENCE_SERVICE_URL: http://sequence-service:9095
+      SERVICE_USER_ID: svc-instruction
+      SERVICE_USER_PASSWORD: Password1!
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      mongo-init:
+        condition: service_completed_successfully
+      opa-policy-seed:
+        condition: service_completed_successfully
+      keycloak-seed:
+        condition: service_completed_successfully
+      sequence-service:
+        condition: service_started
+      authorization-service:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - observability-mesh-net
+
+  payment-service:
+    build:
+      context: ../..
+      dockerfile: workloads/payment-ofac-demo/payment-service/Dockerfile
+    container_name: payment-service
+    ports:
+      - "9093:9093"
+    environment:
+      <<: [*otel-environment, *keycloak-environment]
+      OTEL_SERVICE_NAME: payment-service
+      MONGODB_URI: mongodb://mongodb:27017/?replicaSet=rs0
+      MONGODB_DATABASE: ssi_cash_activities
+      OFAC_DATABASE: ofac
+      AUTHORIZATION_SERVICE_URL: http://authorization-service:9094
+      INSTRUCTION_SERVICE_URL: http://instruction-service:9000
+      SEQUENCE_SERVICE_URL: http://sequence-service:9095
+      SERVICE_USER_ID: svc-payment
+      SERVICE_USER_PASSWORD: Password1!
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      mongo-init:
+        condition: service_completed_successfully
+      opa-policy-seed:
+        condition: service_completed_successfully
+      keycloak-seed:
+        condition: service_completed_successfully
+      instruction-service:
+        condition: service_started
+      authorization-service:
+        condition: service_started
+      sequence-service:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - observability-mesh-net
+
+  ofac-service:
+    build:
+      context: ../..
+      dockerfile: workloads/payment-ofac-demo/ofac-service/Dockerfile
+    container_name: ofac-service
+    ports:
+      - "9096:9096"
+    environment:
+      <<: [*otel-environment, *keycloak-environment]
+      OTEL_SERVICE_NAME: ofac-service
+      MONGODB_URI: mongodb://mongodb:27017/?replicaSet=rs0
+      MONGODB_DATABASE: ofac
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      mongo-init:
+        condition: service_completed_successfully
+      payment-service:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - observability-mesh-net
+
+  demo-harness:
+    build:
+      context: ../..
+      dockerfile: workloads/payment-ofac-demo/demo-harness/Dockerfile
+    container_name: demo-harness
+    ports:
+      - "9091:9091"
+    environment:
+      <<: *keycloak-environment
+      INSTRUCTION_SERVICE_URL: http://instruction-service:9000
+      PAYMENT_SERVICE_URL: http://payment-service:9093
+      MONGODB_URI: mongodb://mongodb:27017/?replicaSet=rs0
+      SRE_CATALOG_HARNESS_USERS_FILE: /app/keycloak-seed/users.yaml
+    volumes:
+      - ./oidc/keycloak-seed/users.yaml:/app/keycloak-seed/users.yaml:ro
+    depends_on:
+      instruction-service:
+        condition: service_started
+      payment-service:
+        condition: service_started
+      keycloak-seed:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    networks:
+      - observability-mesh-net
+
+volumes:
+  mongo-data:
+
+networks:
+  observability-mesh-net:
+    name: observability-mesh-net

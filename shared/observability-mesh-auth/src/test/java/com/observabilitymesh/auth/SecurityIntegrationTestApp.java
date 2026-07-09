@@ -17,5 +17,10 @@ public class SecurityIntegrationTestApp {
         String health() {
             return "UP";
         }
+
+        @GetMapping("/api/v1/instructions")
+        String instructions() {
+            return "[]";
+        }
     }
 }

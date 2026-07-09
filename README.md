@@ -79,7 +79,7 @@ flowchart LR
 
 ### Signal flow
 
-Instrumented Spring services (`instruction-service`, `payment-service`, `ofac-service`, `authorization-service`, `sequence-service`) depend on `shared/observability-mesh-telemetry`, which bundles:
+Instrumented Spring services in the demo workload depend on `workloads/payment-ofac-demo/shared/payment-ofac-telemetry`, which bundles:
 
 - **Metrics** — Micrometer OTLP export (`management.otlp.metrics.export.url`)
 - **Traces** — OpenTelemetry Spring Boot starter (`otel.exporter.otlp.endpoint`, `OTEL_EXPORTER_OTLP_*` env vars)
@@ -96,7 +96,7 @@ Grafana at http://localhost:3000 is pre-provisioned with Prometheus and Tempo da
 
 ### Try it
 
-1. Start the stack and seed demo data: `./scripts/seed-demo-data.sh`
+1. Start the stack and seed demo data: `./workloads/payment-ofac-demo/scripts/seed-demo-data.sh`
 2. Open Grafana → **Dashboards** → **SLOs** → **SLO Overview (Sloth)** — select service `payment-platform` to view sanction-scan SLO burn rate and error budget
 3. Open Grafana → **Explore** → **Prometheus** — e.g. `rate(http_server_requests_seconds_count{service_name="instruction-service"}[5m])`
 4. Open Grafana → **Explore** → **Tempo** — search by `service.name` (e.g. `instruction-service`)
@@ -143,13 +143,13 @@ flowchart LR
 3. Run `sloth generate` and write `{sloName}.yml` under the tenant's Prometheus rules directory; archive removed SLOs to `_archive/` (orphan policy: drop rules, mark `ARCHIVED` in `slo_provision_state` — Grafana objects are not deleted).
 4. `POST` Prometheus `/-/reload` when rules change.
 
-**SLO provisioner browser** — http://localhost:9097/ui/ is a read-only admin UI (Keycloak JWT, `PLATFORM_ADMIN` role) with tabs for **SLO provisions** and **SLI definitions**. It lists active documents from PostgreSQL together with provision status (`ACTIVE`, `FAILED`, `ARCHIVED`, `NOT_PROVISIONED`); open a row for indicator PromQL, generated Prometheus recording rules YAML, and the source OpenSLO JSON. Sign in with **`admin-001`** / **`Password1!`**.
+**SLO provisioner browser** — http://localhost:9097/ui/ is a read-only admin UI with tabs for **SLO provisions** and **SLI definitions**. It lists active documents from PostgreSQL together with provision status (`ACTIVE`, `FAILED`, `ARCHIVED`, `NOT_PROVISIONED`); open a row for indicator PromQL, generated Prometheus recording rules YAML, and the source OpenSLO JSON. Platform services run **without authentication** for now (`observability-mesh.auth.enabled=false` in compose); workload demo UIs still use Keycloak.
 
 Datasource allowlist is configured in `application.properties` (`observability-mesh.slo-provisioner.datasource-names=payment-prometheus`). Emit matching metrics from the demo workload to evaluate SLOs in Grafana.
 
 ### OpenSLO authoring
 
-`slo-author-service` (port 9090) is where developers author, validate, and version OpenSLO v1 documents through a browser UI and REST API. Documents are validated with the [open-slo-java-sdk](https://github.com/sanjuthomas/open-slo-java-sdk) and stored in **PostgreSQL** (`open_slo` database, `service_level_objectives` table with JSONB `content`). It authenticates against Keycloak (OIDC) like the other services — sign in at http://localhost:9090/ui/ with demo credentials **`admin-001`** / **`Password1!`** (any user from [keycloak-seed/users.yaml](keycloak-seed/users.yaml) works); the `/api/v1/documents/**` API is JWT-protected. `slo-provisioner-service` then reads those active SLOs and translates them into Prometheus rules via Sloth.
+`slo-author-service` (port 9090) is where developers author, validate, and version OpenSLO v1 documents through a browser UI and REST API. Documents are validated with the [open-slo-java-sdk](https://github.com/sanjuthomas/open-slo-java-sdk) and stored in **PostgreSQL** (`open_slo` database, `service_level_objectives` table with JSONB `content`). Platform services run **without authentication** for now; open http://localhost:9090/ui/ directly. `slo-provisioner-service` then reads those active SLOs and translates them into Prometheus rules via Sloth.
 
 ## Sanction scanning (OFAC)
 
@@ -211,37 +211,40 @@ The centralized observability team does **not** phase out. It curates and publis
 | **SLOs & reliability goals** | Ship Sloth provisioning, baseline Grafana datasources, and reference dashboards as part of the catalog | Author OpenSLO documents, run **their** `slo-author-service` / `slo-provisioner-service`, and review **their** burn-rate dashboards |
 | **Compose & run** | Publish reference Compose/Kubernetes manifests and environment contracts (ports, env vars, volume mounts) | Compose and operate a full mesh stack for **their** application; add app-specific scrape labels and SLO namespaces |
 
-In this repo, `docker-compose.yml` is a **single-tenant reference composition** — one team's copy of the pattern. The platform team owns the service definitions and image pins in that template; an application team forks the composition, adds their services, and runs an isolated instance. Federated ownership means applications stay close to their telemetry and SLOs, while the central team absorbs the undifferentiated work of **packaging** the stack, not **running** everyone else's backends.
+In this repo, each workload **includes** the shared platform compose (`platform/docker-compose.yml`) and adds its own services. The root `docker-compose.yml` is a convenience shim for the default demo workload. The platform team owns `platform/`; workload teams own `workloads/<name>/` and override platform settings (SLO seeds, provisioner datasource names) without forking platform code.
 
 ## Quick start
 
 ```bash
 # Full stack + demo seed (builds images, seeds Keycloak users, loads demo data)
-./scripts/seed-demo-data.sh
+./workloads/payment-ofac-demo/scripts/seed-demo-data.sh
 
-# Or manually:
+# Or manually (from repo root — convenience shim for the default workload):
 docker compose up -d --build
+
+# Or from the workload directory (canonical entry point):
+docker compose -f workloads/payment-ofac-demo/docker-compose.yml up -d --build
 # Wait for keycloak-seed to finish, then seed demo data only:
-./scripts/seed-demo-data.sh --seed-only
+./workloads/payment-ofac-demo/scripts/seed-demo-data.sh --seed-only
 ```
 
-Default demo password: `Password1!` (see [keycloak-seed/users.yaml](keycloak-seed/users.yaml)).
+Default demo password: `Password1!` (see [keycloak-seed/users.yaml](workloads/payment-ofac-demo/oidc/keycloak-seed/users.yaml)).
 
 If another Docker stack already uses names like `mongodb`, `postgres`, or `opensearch`, stop it first or Compose will fail with a container name conflict.
 
 ## Service URLs
 
-Demo Keycloak users (instruction, payment, OFAC, SLO provisioner, authorization, harness, and SLO authoring UIs) share password **`Password1!`** — any `user_id` from [keycloak-seed/users.yaml](keycloak-seed/users.yaml) works. Platform operator default: **`admin-001`**.
+Demo Keycloak users (instruction, payment, OFAC, authorization, and harness UIs) share password **`Password1!`** — any `user_id` from [keycloak-seed/users.yaml](workloads/payment-ofac-demo/oidc/keycloak-seed/users.yaml) works. Platform operator default: **`admin-001`**. SLO author (:9090) and provisioner (:9097) browsers do **not** require sign-in in the current demo.
 
 | URL | Service | Username | Password |
 |-----|---------|----------|----------|
 | http://localhost:9000/ui/ | Instruction browser | `admin-001` | `Password1!` |
 | http://localhost:9093/ui/ | Payment browser | `admin-001` | `Password1!` |
 | http://localhost:9096/ui/ | OFAC scan browser | `admin-001` | `Password1!` |
-| http://localhost:9097/ui/ | SLO provisioner browser | `admin-001` | `Password1!` |
 | http://localhost:9094/ui/ | Authorization user directory | `admin-001` | `Password1!` |
 | http://localhost:9091 | Demo harness | `admin-001` | `Password1!` |
-| http://localhost:9090/ui/ | SLO authoring service | `admin-001` | `Password1!` |
+| http://localhost:9090/ui/ | SLO authoring service | — | — |
+| http://localhost:9097/ui/ | SLO provisioner browser | — | — |
 | http://localhost:9080 | Keycloak admin console | `admin` | `admin` |
 | http://localhost:3000 | Grafana — metrics & traces | `admin` | `admin` |
 | http://localhost:9092 | Prometheus UI | — | — |
@@ -255,44 +258,48 @@ Services marked **—** have no authentication in the demo compose stack (public
 
 ```bash
 ./mvnw verify                    # tests + JaCoCo gate
-./mvnw -pl instruction-service spring-boot:run
-./mvnw -pl ofac-service spring-boot:run   # OFAC batch processor + scan browser on :9096
+./mvnw -pl workloads/payment-ofac-demo/instruction-service -am spring-boot:run
+./mvnw -pl workloads/payment-ofac-demo/ofac-service -am spring-boot:run
 ./mvnw -pl slo-provisioner-service spring-boot:run   # Sloth batch + provisioner browser on :9097
 ```
 
 Run backing infrastructure and peer services:
 
 ```bash
-docker compose up -d mongodb mongo-init postgres opa opa-policy-seed keycloak keycloak-seed \
-  otel-collector opensearch opensearch-dashboards prometheus tempo grafana \
-  sequence-service authorization-service instruction-service payment-service ofac-service \
-  slo-author-service slo-provisioner-service
+docker compose up -d   # repo-root shim → platform + payment-ofac-demo workload
+# Or: docker compose -f workloads/payment-ofac-demo/docker-compose.yml up -d
 ```
 
-Point a locally running service at the collector with `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317`.
+Point a locally running service at the collector with `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318`.
 
 ## Repository layout
 
 ```
 .
-├── shared/                  # Common libraries (auth, authz client, telemetry, …)
-├── instruction-service/
-├── payment-service/
-├── ofac-service/            # Sanction scan simulator + scan browser UI (`ofac` DB)
-├── slo-author-service/      # OpenSLO authoring UI + API (Keycloak OIDC)
-├── slo-provisioner-service/ # OpenSLO → Sloth → Prometheus rules batch + browser UI
-├── authorization-service/
-├── sequence-service/
-├── demo-harness/
-├── keycloak-seed/
-├── opa-policy-seed/
-├── postgres/                # PostgreSQL init for SLO catalog (open_slo)
-├── prometheus/              # Prometheus scrape config (otel-collector metrics)
-├── tempo/                   # Tempo trace storage config
-├── grafana/                 # Grafana datasource + SLO dashboard provisioning
+├── platform/
+│   └── docker-compose.yml           # observability mesh (otel, prometheus, grafana, SLO services, …)
+├── shared/                          # Platform libraries (auth, common, telemetry)
+├── workloads/
+│   └── payment-ofac-demo/           # SSI instruction/payment/OFAC demo workload
+│       ├── shared/                  # payment-ofac-common, payment-ofac-auth, payment-ofac-telemetry, …
+│       ├── authorization-service/
+│       ├── demo-harness/
+│       ├── instruction-service/
+│       ├── ofac-service/
+│       ├── opa-policy-seed/
+│       ├── payment-service/
+│       ├── oidc/keycloak-seed/      # workload identity (Keycloak realm + users)
+│       ├── postgres/seed-slos.sql   # workload-specific OpenSLO seed
+│       ├── sequence-service/
+│       ├── docker-compose.yml       # includes platform/ + workload services
+│       └── scripts/seed-demo-data.sh
+├── slo-author-service/              # OpenSLO authoring UI + API (Keycloak OIDC)
+├── slo-provisioner-service/         # OpenSLO → Sloth → Prometheus rules batch + browser UI
+├── prometheus/                      # Prometheus scrape config (otel-collector metrics)
+├── tempo/                           # Tempo trace storage config
+├── grafana/                         # Grafana datasource + SLO dashboard provisioning
 ├── otel-collector-config.yaml
-├── docker-compose.yml
-└── scripts/seed-demo-data.sh
+└── docker-compose.yml               # shim → workloads/payment-ofac-demo/docker-compose.yml
 ```
 
 ## Reset
@@ -300,5 +307,5 @@ Point a locally running service at the collector with `OTEL_EXPORTER_OTLP_ENDPOI
 ```bash
 docker compose down -v --remove-orphans
 docker compose up -d --build
-./scripts/seed-demo-data.sh --seed-only
+./workloads/payment-ofac-demo/scripts/seed-demo-data.sh --seed-only
 ```

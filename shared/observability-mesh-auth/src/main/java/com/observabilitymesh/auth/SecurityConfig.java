@@ -1,6 +1,7 @@
 package com.observabilitymesh.auth;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -34,6 +35,16 @@ public class SecurityConfig {
 
     @Bean
     @Order(2)
+    @ConditionalOnProperty(name = "observability-mesh.auth.enabled", havingValue = "false")
+    SecurityFilterChain openApiSecurity(HttpSecurity http) throws Exception {
+        http.csrf(csrf -> csrf.disable())
+                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
+        return http.build();
+    }
+
+    @Bean
+    @Order(2)
+    @ConditionalOnProperty(name = "observability-mesh.auth.enabled", havingValue = "true", matchIfMissing = true)
     SecurityFilterChain apiSecurity(
             HttpSecurity http,
             @Value("${observability-mesh.auth.authorized-service-user-ids:}") String authorizedServiceUserIds) throws Exception {

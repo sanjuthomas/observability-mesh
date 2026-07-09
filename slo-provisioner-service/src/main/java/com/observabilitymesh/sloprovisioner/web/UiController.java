@@ -6,6 +6,7 @@ import com.observabilitymesh.sloprovisioner.service.ProvisionDocumentNotFoundExc
 import com.observabilitymesh.sloprovisioner.service.ProvisionUiService;
 import com.observabilitymesh.sloprovisioner.service.SubjectAccess;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -31,10 +32,15 @@ public class UiController {
 
     private final ProvisionUiService provisionUiService;
     private final RequestSubjectResolver subjectResolver;
+    private final boolean authEnabled;
 
-    public UiController(ProvisionUiService provisionUiService, RequestSubjectResolver subjectResolver) {
+    public UiController(
+            ProvisionUiService provisionUiService,
+            RequestSubjectResolver subjectResolver,
+            @Value("${observability-mesh.auth.enabled:true}") boolean authEnabled) {
         this.provisionUiService = provisionUiService;
         this.subjectResolver = subjectResolver;
+        this.authEnabled = authEnabled;
     }
 
     @GetMapping(value = {"/ui", "/ui/"})
@@ -91,6 +97,9 @@ public class UiController {
     }
 
     private void requireAdmin(HttpServletRequest request) {
+        if (!authEnabled) {
+            return;
+        }
         Subject subject = subjectResolver.resolveActor(request);
         SubjectAccess.requirePlatformAdmin(subject);
     }

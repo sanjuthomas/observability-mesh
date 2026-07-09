@@ -4,7 +4,7 @@ Guidance for AI coding agents working in **Observability Mesh** (`observability-
 
 ## Project summary
 
-**Observability Mesh** — Java monorepo with a demo workload (policy-aware SSI cash instruction and payment lifecycle, trimmed port of [policy-pilot](https://github.com/sanjuthomas/policy-pilot)) and a composable observability stack: demo app on **MongoDB**, **SLO catalog on PostgreSQL** (no Kafka, Neo4j, or chat), per-service browser UIs, demo harness, **Keycloak OIDC**, **OPA**, **SLO author service (OpenSLO authoring)**, **SLO provisioner (Sloth)**, **otel-collector**, **Prometheus**, **Tempo**, **Grafana**, and **OpenSearch**.
+**Observability Mesh** — Java monorepo with a composable observability stack (**PostgreSQL SLO catalog**, **otel-collector**, **Prometheus**, **Tempo**, **Grafana**, **OpenSearch**, **Keycloak**, **SLO author**, **SLO provisioner**) and a demo workload under `workloads/payment-ofac-demo/` (policy-aware SSI cash instruction/payment lifecycle + OFAC sanction scans on **MongoDB**).
 
 Stack: Java **21**, Maven Wrapper (`./mvnw`), JaCoCo (**80% minimum overall coverage** per module).
 
@@ -48,9 +48,11 @@ Agents **must**:
 ## Commands
 
 ```bash
-docker compose up -d                    # full stack
+docker compose up -d                    # repo-root shim → platform + payment-ofac-demo workload
+# Or: docker compose -f workloads/payment-ofac-demo/docker-compose.yml up -d
 ./mvnw verify                           # tests + JaCoCo gate
-./scripts/seed-demo-data.sh             # demo data via harness
+./workloads/payment-ofac-demo/scripts/seed-demo-data.sh             # demo data via harness (workload)
+./mvnw -pl workloads/payment-ofac-demo/payment-service -am verify
 ```
 
 | URL | Service |

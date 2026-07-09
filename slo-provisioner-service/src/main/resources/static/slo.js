@@ -124,10 +124,6 @@ async function loadSlo() {
     showError("Missing SLO name in URL.");
     return;
   }
-  if (!AdminAuth.loadSession()) {
-    showError("Admin sign-in required.");
-    return;
-  }
   try {
     const response = await AdminAuth.adminFetch(`/api/ui/slos/${encodeURIComponent(name)}`);
     if (!response.ok) {
@@ -165,3 +161,5 @@ AdminAuth.bindAdminAuthPanel({
   logoutBtn: document.getElementById("auth-logout-btn"),
   onAuthenticated: () => void loadSlo(),
 });
+
+void loadSlo();

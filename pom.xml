@@ -21,17 +21,10 @@
     <modules>
         <module>shared/observability-mesh-common</module>
         <module>shared/observability-mesh-auth</module>
-        <module>shared/observability-mesh-authz-client</module>
-        <module>shared/observability-mesh-sequence-client</module>
         <module>shared/observability-mesh-telemetry</module>
-        <module>sequence-service</module>
-        <module>authorization-service</module>
-        <module>instruction-service</module>
-        <module>payment-service</module>
-        <module>ofac-service</module>
         <module>slo-author-service</module>
         <module>slo-provisioner-service</module>
-        <module>demo-harness</module>
+        <module>workloads/payment-ofac-demo</module>
     </modules>
 
     <properties>
@@ -53,16 +46,6 @@
             <dependency>
                 <groupId>com.observabilitymesh</groupId>
                 <artifactId>observability-mesh-auth</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.observabilitymesh</groupId>
-                <artifactId>observability-mesh-authz-client</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.observabilitymesh</groupId>
-                <artifactId>observability-mesh-sequence-client</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

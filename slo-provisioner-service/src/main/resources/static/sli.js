@@ -60,10 +60,6 @@ async function loadSli() {
     showError("Missing SLI name in URL.");
     return;
   }
-  if (!AdminAuth.loadSession()) {
-    showError("Admin sign-in required.");
-    return;
-  }
   try {
     const response = await AdminAuth.adminFetch(`/api/ui/slis/${encodeURIComponent(name)}`);
     if (!response.ok) {
@@ -96,3 +92,5 @@ AdminAuth.bindAdminAuthPanel({
   logoutBtn: document.getElementById("auth-logout-btn"),
   onAuthenticated: () => void loadSli(),
 });
+
+void loadSli();

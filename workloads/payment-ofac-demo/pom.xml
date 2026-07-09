@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.observabilitymesh</groupId>
+        <artifactId>observability-mesh</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+        <relativePath>../../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>payment-ofac-demo</artifactId>
+    <packaging>pom</packaging>
+    <name>payment-ofac-demo</name>
+    <description>Policy-aware SSI cash instruction and payment demo workload (OFAC sanction scans)</description>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>com.observabilitymesh</groupId>
+                <artifactId>payment-ofac-common</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.observabilitymesh</groupId>
+                <artifactId>payment-ofac-auth</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.observabilitymesh</groupId>
+                <artifactId>payment-ofac-telemetry</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.observabilitymesh</groupId>
+                <artifactId>payment-ofac-authz-client</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.observabilitymesh</groupId>
+                <artifactId>payment-ofac-sequence-client</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <modules>
+        <module>shared/payment-ofac-common</module>
+        <module>shared/payment-ofac-auth</module>
+        <module>shared/payment-ofac-telemetry</module>
+        <module>shared/payment-ofac-authz-client</module>
+        <module>shared/payment-ofac-sequence-client</module>
+        <module>sequence-service</module>
+        <module>authorization-service</module>
+        <module>instruction-service</module>
+        <module>payment-service</module>
+        <module>ofac-service</module>
+        <module>demo-harness</module>
+    </modules>
+</project>
