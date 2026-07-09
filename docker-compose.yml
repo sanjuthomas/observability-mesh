@@ -1,6 +1,9 @@
 x-otel-environment: &otel-environment
-  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+  OTEL_EXPORTER_OTLP_METRICS_URL: http://otel-collector:4318/v1/metrics
+  OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
   OTEL_EXPORTER_OTLP_INSECURE: "true"
+  OTEL_METRIC_EXPORT_STEP: 15s
   OTEL_LOG_CONSOLE: "true"
   OTEL_DEPLOYMENT_ENVIRONMENT: development
   OTEL_METRIC_EXPORT_INTERVAL: "15000"

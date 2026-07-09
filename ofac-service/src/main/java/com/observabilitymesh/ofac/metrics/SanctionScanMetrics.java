@@ -1,8 +1,10 @@
 package com.observabilitymesh.ofac.metrics;
 
 import com.observabilitymesh.ofac.model.OfacScanResult;
-import io.micrometer.core.instrument.Counter;
-import io.micrometer.core.instrument.MeterRegistry;
+import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.api.common.Attributes;
+import io.opentelemetry.api.common.AttributesBuilder;
+import io.opentelemetry.api.metrics.LongCounter;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
@@ -14,33 +16,24 @@ public class SanctionScanMetrics {
     static final String DURATION_LE_60S = "60s";
     static final Duration LATENCY_BUDGET = Duration.ofSeconds(60);
 
-    private final MeterRegistry registry;
+    private final LongCounter counter;
 
-    public SanctionScanMetrics(MeterRegistry registry) {
-        this.registry = registry;
+    public SanctionScanMetrics(OpenTelemetry openTelemetry) {
+        this.counter = openTelemetry.getMeter("com.observabilitymesh.ofac")
+                .counterBuilder(METRIC_NAME)
+                .setDescription("OFAC sanction scans completed")
+                .build();
     }
 
     public void recordCompletion(OfacScanResult result, Duration durationSinceRequest) {
         if (result == null || durationSinceRequest == null || durationSinceRequest.isNegative()) {
             return;
         }
+        AttributesBuilder attributes = Attributes.builder().put("result", result.name());
         if (withinLatencyBudget(result, durationSinceRequest)) {
-            counter(result.name(), DURATION_LE_60S).increment();
-        } else {
-            counter(result.name(), null).increment();
+            attributes.put("duration_le", DURATION_LE_60S);
         }
-    }
-
-    private Counter counter(String result, String durationLe) {
-        if (durationLe == null) {
-            return Counter.builder(METRIC_NAME)
-                    .tag("result", result)
-                    .register(registry);
-        }
-        return Counter.builder(METRIC_NAME)
-                .tag("result", result)
-                .tag("duration_le", durationLe)
-                .register(registry);
+        counter.add(1, attributes.build());
     }
 
     static boolean withinLatencyBudget(OfacScanResult result, Duration durationSinceRequest) {
