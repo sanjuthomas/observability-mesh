@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SLO Provisioner Browser</title>
+    <link rel="stylesheet" href="/ui/static/styles.css?v=1" />
+    <script>
+      window.ADMIN_AUTH_STORAGE_KEY = "slo-provisioner-admin-session";
+    </script>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark"></span>
+        <div>
+          <h1>SLO Provisioner Browser</h1>
+          <p class="subtitle">OpenSLO → Sloth → Prometheus · read-only</p>
+        </div>
+      </div>
+      <div class="status-group">
+        <nav class="nav-links" aria-label="Provisioner views">
+          <button type="button" id="tab-slos" class="tab active">SLO provisions</button>
+          <button type="button" id="tab-slis" class="tab">SLI definitions</button>
+        </nav>
+        <div class="admin-auth">
+          <span id="auth-status" class="muted">Admin sign-in required</span>
+          <input id="auth-user" type="text" value="admin-001" aria-label="Admin user" />
+          <input id="auth-password" type="password" placeholder="Password" aria-label="Password" />
+          <button type="button" id="auth-login-btn" class="btn">Sign in</button>
+          <button type="button" id="auth-logout-btn" class="btn btn-ghost hidden">Sign out</button>
+        </div>
+        <div id="load-status" class="status-pill status-connecting">Loading</div>
+        <div class="stat">
+          <span class="stat-label">Shown</span>
+          <span id="stat-total" class="stat-value">0</span>
+        </div>
+      </div>
+    </header>
+
+    <section id="slo-toolbar" class="toolbar">
+      <label class="filter">
+        Provision status
+        <select id="status-filter">
+          <option value="ALL">All</option>
+          <option value="ACTIVE">ACTIVE</option>
+          <option value="FAILED">FAILED</option>
+          <option value="ARCHIVED">ARCHIVED</option>
+          <option value="NOT_PROVISIONED">NOT_PROVISIONED</option>
+        </select>
+      </label>
+      <button id="refresh-btn" type="button" class="btn">Refresh</button>
+      <button id="pause-btn" type="button" class="btn">Pause live feed</button>
+    </section>
+
+    <section id="sli-toolbar" class="toolbar hidden">
+      <button id="refresh-sli-btn" type="button" class="btn">Refresh</button>
+      <button id="pause-sli-btn" type="button" class="btn">Pause live feed</button>
+    </section>
+
+    <main id="slo-panel" class="table-wrap">
+      <table id="slos-table">
+        <thead>
+          <tr>
+            <th class="col-id">SLO name</th>
+            <th>Service</th>
+            <th>Target</th>
+            <th>Window</th>
+            <th>Indicator</th>
+            <th>Status</th>
+            <th>Rules file</th>
+            <th>Last synced (UTC)</th>
+          </tr>
+        </thead>
+        <tbody id="slos-body"></tbody>
+      </table>
+      <div id="slo-empty-state" class="empty-state hidden">No SLO provisions found.</div>
+    </main>
+
+    <main id="sli-panel" class="table-wrap hidden">
+      <table id="slis-table">
+        <thead>
+          <tr>
+            <th class="col-id">SLI name</th>
+            <th>Datasource</th>
+            <th>Good PromQL</th>
+            <th>Total PromQL</th>
+          </tr>
+        </thead>
+        <tbody id="slis-body"></tbody>
+      </table>
+      <div id="sli-empty-state" class="empty-state hidden">No SLI definitions found.</div>
+    </main>
+
+    <script src="/ui/static/admin-auth.js?v=1"></script>
+    <script src="/ui/static/app.js?v=1"></script>
+  </body>
+</html>

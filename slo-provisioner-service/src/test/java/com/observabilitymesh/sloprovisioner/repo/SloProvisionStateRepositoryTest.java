@@ -70,6 +70,16 @@ class SloProvisionStateRepositoryTest {
     }
 
     @Test
+    void listAllReturnsStates() {
+        SloProvisionState state = new SloProvisionState(
+                "key", 1, ProvisionStatus.ACTIVE, "demo.yml", "abc", Instant.now(), null);
+        when(jdbcTemplate.query(any(String.class), any(RowMapper.class)))
+                .thenReturn(List.of(state));
+
+        assertThat(repository.listAll()).hasSize(1);
+    }
+
+    @Test
     void upsertPersistsRow() {
         Instant syncedAt = Instant.parse("2026-01-01T00:00:00Z");
         SloProvisionState state = new SloProvisionState(

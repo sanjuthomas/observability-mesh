@@ -4,7 +4,7 @@ Reference stack for **observability sovereignty without enterprise licensing** �
 
 The policy-aware SSI microservices platform is the **demo workload**: a trimmed Java port of [policy-pilot](https://github.com/sanjuthomas/policy-pilot) that exercises the catalog end-to-end. It generates realistic telemetry and business events (including sanction-scan latency) so you can see how the pieces fit together without building a production payments system first.
 
-OpenSLO documents are authored in `slo-author-service` (a Keycloak-secured Spring Boot service and browser UI in this monorepo). `slo-provisioner-service` compiles active SLOs through [Sloth](https://github.com/slok/sloth) into Prometheus recording rules for Grafana SLO dashboards (import [dashboard 14348](https://grafana.com/grafana/dashboards/14348-sloth-slo/) in Grafana OSS).
+OpenSLO documents are authored in `slo-author-service` (a Keycloak-secured Spring Boot service and browser UI in this monorepo). `slo-provisioner-service` compiles active SLOs through [Sloth](https://github.com/slok/sloth) into Prometheus recording rules for Grafana SLO dashboards (import [dashboard 14348](https://grafana.com/grafana/dashboards/14348-sloth-slo/) in Grafana OSS) and exposes a read-only browser UI for provision status and generated rules.
 
 ## Why I built this
 
@@ -46,7 +46,7 @@ flowchart LR
 
 OpenSLO authoring (`slo-author-service`) and SLO provisioning (`slo-provisioner-service`) are part of the stack but omitted here; see **OpenSLO → Sloth → Prometheus** under Observability for that path.
 
-**In scope:** instruction, payment, authorization, sequence, and OFAC services; SLO author and SLO provisioner; demo harness; per-service browser UIs (instructions, payments, OFAC scans, authorization directory, OpenSLO authoring); OPA policies; Keycloak seed; metrics and trace visualization.
+**In scope:** instruction, payment, authorization, sequence, and OFAC services; SLO author and SLO provisioner; demo harness; per-service browser UIs (instructions, payments, OFAC scans, SLO provisions, authorization directory, OpenSLO authoring); OPA policies; Keycloak seed; metrics and trace visualization.
 
 **Out of scope (by design):** Kafka, Neo4j, indexer, chat/RAG.
 
@@ -142,6 +142,8 @@ flowchart LR
 3. Run `sloth generate` and write `{sloName}.yml` under the tenant's Prometheus rules directory; archive removed SLOs to `_archive/` (orphan policy: drop rules, mark `ARCHIVED` in `slo_provision_state` — Grafana objects are not deleted).
 4. `POST` Prometheus `/-/reload` when rules change.
 
+**SLO provisioner browser** — http://localhost:9097/ui/ is a read-only admin UI (Keycloak JWT, `PLATFORM_ADMIN` role) with tabs for **SLO provisions** and **SLI definitions**. It lists active documents from PostgreSQL together with provision status (`ACTIVE`, `FAILED`, `ARCHIVED`, `NOT_PROVISIONED`); open a row for indicator PromQL, generated Prometheus recording rules YAML, and the source OpenSLO JSON. Sign in with **`admin-001`** / **`Password1!`**.
+
 Datasource allowlist is configured in `application.properties` (`observability-mesh.slo-provisioner.datasource-names=payment-prometheus`). Emit matching metrics from the demo workload to evaluate SLOs in Grafana.
 
 ### OpenSLO authoring
@@ -228,14 +230,14 @@ If another Docker stack already uses names like `mongodb`, `postgres`, or `opens
 
 ## Service URLs
 
-Demo Keycloak users (instruction, payment, OFAC, authorization, harness, and SLO authoring UIs) share password **`Password1!`** — any `user_id` from [keycloak-seed/users.yaml](keycloak-seed/users.yaml) works. Platform operator default: **`admin-001`**.
+Demo Keycloak users (instruction, payment, OFAC, SLO provisioner, authorization, harness, and SLO authoring UIs) share password **`Password1!`** — any `user_id` from [keycloak-seed/users.yaml](keycloak-seed/users.yaml) works. Platform operator default: **`admin-001`**.
 
 | URL | Service | Username | Password |
 |-----|---------|----------|----------|
 | http://localhost:9000/ui/ | Instruction browser | `admin-001` | `Password1!` |
 | http://localhost:9093/ui/ | Payment browser | `admin-001` | `Password1!` |
 | http://localhost:9096/ui/ | OFAC scan browser | `admin-001` | `Password1!` |
-| http://localhost:9097/actuator/health | SLO provisioner (OpenSLO → Sloth batch) | — | — |
+| http://localhost:9097/ui/ | SLO provisioner browser | `admin-001` | `Password1!` |
 | http://localhost:9094/ui/ | Authorization user directory | `admin-001` | `Password1!` |
 | http://localhost:9091 | Demo harness | `admin-001` | `Password1!` |
 | http://localhost:9090/ui/ | SLO authoring service | `admin-001` | `Password1!` |
@@ -254,6 +256,7 @@ Services marked **—** have no authentication in the demo compose stack (public
 ./mvnw verify                    # tests + JaCoCo gate
 ./mvnw -pl instruction-service spring-boot:run
 ./mvnw -pl ofac-service spring-boot:run   # OFAC batch processor + scan browser on :9096
+./mvnw -pl slo-provisioner-service spring-boot:run   # Sloth batch + provisioner browser on :9097
 ```
 
 Run backing infrastructure and peer services:
@@ -262,7 +265,7 @@ Run backing infrastructure and peer services:
 docker compose up -d mongodb mongo-init postgres opa opa-policy-seed keycloak keycloak-seed \
   otel-collector opensearch opensearch-dashboards prometheus tempo grafana \
   sequence-service authorization-service instruction-service payment-service ofac-service \
-  slo-author-service
+  slo-author-service slo-provisioner-service
 ```
 
 Point a locally running service at the collector with `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317`.
@@ -276,7 +279,7 @@ Point a locally running service at the collector with `OTEL_EXPORTER_OTLP_ENDPOI
 ├── payment-service/
 ├── ofac-service/            # Sanction scan simulator + scan browser UI (`ofac` DB)
 ├── slo-author-service/      # OpenSLO authoring UI + API (Keycloak OIDC)
-├── slo-provisioner-service/ # OpenSLO → Sloth → Prometheus rules batch
+├── slo-provisioner-service/ # OpenSLO → Sloth → Prometheus rules batch + browser UI
 ├── authorization-service/
 ├── sequence-service/
 ├── demo-harness/

@@ -466,7 +466,7 @@ services:
     ports:
       - "9097:9097"
     environment:
-      <<: *otel-environment
+      <<: [*otel-environment, *keycloak-environment]
       OTEL_SERVICE_NAME: slo-provisioner-service
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/open_slo
       SPRING_DATASOURCE_USERNAME: open_slo

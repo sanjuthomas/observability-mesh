@@ -52,4 +52,17 @@ class RulesFileManagerTest {
     void archiveRulesNoOpWhenActiveFileMissing() throws Exception {
         rulesFileManager.archiveRules("missing-slo");
     }
+
+    @Test
+    void readActiveRulesContentReturnsFileText() throws Exception {
+        Path generated = tempDir.resolve("generated.yml");
+        Files.writeString(generated, "groups: []\n");
+        rulesFileManager.publishActiveRules("demo-slo", generated);
+
+        assertThat(rulesFileManager.readActiveRulesContent("demo-slo"))
+                .get()
+                .asString()
+                .contains("groups:");
+        assertThat(rulesFileManager.readActiveRulesContent("missing-slo")).isEmpty();
+    }
 }

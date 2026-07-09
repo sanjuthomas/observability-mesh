@@ -44,6 +44,15 @@ public class SloProvisionStateRepository {
         return jdbcTemplate.query(sql, rowMapper, status.name());
     }
 
+    public List<SloProvisionState> listAll() {
+        String sql = """
+                SELECT logical_key, openslo_version, status, rules_file_name, content_hash, last_synced_at, last_error
+                FROM %s
+                ORDER BY last_synced_at DESC
+                """.formatted(table);
+        return jdbcTemplate.query(sql, rowMapper);
+    }
+
     public void upsert(SloProvisionState state) {
         String sql = """
                 INSERT INTO %s (logical_key, openslo_version, status, rules_file_name, content_hash, last_synced_at, last_error)
