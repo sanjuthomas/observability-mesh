@@ -14,5 +14,6 @@ class UiControllerTest {
         MockMvc mockMvc = MockMvcBuilders.standaloneSetup(new UiController()).build();
         mockMvc.perform(get("/")).andExpect(status().isOk());
         mockMvc.perform(get("/index.html")).andExpect(status().isOk());
+        mockMvc.perform(get("/ui/")).andExpect(status().isOk());
     }
 }

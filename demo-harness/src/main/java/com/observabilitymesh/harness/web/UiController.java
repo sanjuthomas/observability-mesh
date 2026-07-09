@@ -6,7 +6,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 @Controller
 public class UiController {
 
-    @GetMapping({"/", "/index.html"})
+    @GetMapping({"/", "/index.html", "/ui", "/ui/"})
     public String index() {
         return "forward:/static/index.html";
     }

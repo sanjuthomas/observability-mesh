@@ -44,11 +44,11 @@ async function refreshStatus() {
     }
     const data = await response.json();
 
-    if (data.zitadel_configured) {
-      patStatus.textContent = "ZITADEL ready";
+    if (data.keycloak_configured || data.zitadel_configured) {
+      patStatus.textContent = "Keycloak ready";
       patStatus.className = "status-pill status-live";
     } else {
-      patStatus.textContent = "ZITADEL PAT missing";
+      patStatus.textContent = "Keycloak not configured";
       patStatus.className = "status-pill status-error";
     }
 

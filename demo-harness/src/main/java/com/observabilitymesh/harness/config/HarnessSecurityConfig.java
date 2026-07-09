@@ -23,6 +23,8 @@ public class HarnessSecurityConfig {
                         "/api/auth/login",
                         "/",
                         "/index.html",
+                        "/ui",
+                        "/ui/**",
                         "/static/**",
                         "/swagger-ui/**",
                         "/v3/api-docs/**")
