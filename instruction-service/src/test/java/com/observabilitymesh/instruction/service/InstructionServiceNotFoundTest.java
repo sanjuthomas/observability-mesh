@@ -38,9 +38,9 @@ class InstructionServiceNotFoundTest {
                 .registerModule(new JavaTimeModule())
                 .setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
                 .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-        instructionService = new InstructionService(
+        instructionService = InstructionServiceTestFixtures.instructionService(
                 repository, securityEventRepository, authzClient, sequenceClient,
-                serviceTokenHolder, InstructionTestFixtures.properties(), objectMapper);
+                serviceTokenHolder, InstructionTestFixtures.properties());
     }
 
     @Test

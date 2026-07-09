@@ -7,6 +7,7 @@ import com.observabilitymesh.authzclient.AuthzClient;
 import com.observabilitymesh.payment.client.InstructionClient;
 import com.observabilitymesh.payment.config.PaymentProperties;
 import com.observabilitymesh.payment.config.ServiceIdentity;
+import com.observabilitymesh.payment.metrics.PaymentLifecycleMetrics;
 import com.observabilitymesh.payment.ofac.OfacScanRequestRepository;
 import com.observabilitymesh.payment.repo.PaymentRepository;
 import com.observabilitymesh.payment.security.SecurityEventRepository;
@@ -16,6 +17,8 @@ import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.AbstractPlatformTransactionManager;
 import org.springframework.transaction.support.DefaultTransactionStatus;
 import org.springframework.transaction.support.TransactionTemplate;
+
+import static org.mockito.Mockito.mock;
 
 final class PaymentServiceTestFixtures {
 
@@ -41,6 +44,7 @@ final class PaymentServiceTestFixtures {
                 serviceIdentity,
                 properties,
                 testObjectMapper(),
+                mock(PaymentLifecycleMetrics.class),
                 passthroughTransactionTemplate());
     }
 

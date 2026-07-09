@@ -57,9 +57,9 @@ class InstructionServiceRemainingBranchesTest {
                 .registerModule(new JavaTimeModule())
                 .setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
                 .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-        instructionService = new InstructionService(
+        instructionService = InstructionServiceTestFixtures.instructionService(
                 repository, securityEventRepository, authzClient, sequenceClient,
-                serviceTokenHolder, InstructionTestFixtures.properties(), objectMapper);
+                serviceTokenHolder, InstructionTestFixtures.properties());
     }
 
     @Test
@@ -180,9 +180,9 @@ class InstructionServiceRemainingBranchesTest {
         InstructionProperties properties = new InstructionProperties(
                 "instructions", "security_events", "instruction_service",
                 "svc-instruction", "Password1!", "COMPLIANCE_ANALYST", "user-001", "admin-001", 200);
-        InstructionService service = new InstructionService(
+        InstructionService service = InstructionServiceTestFixtures.instructionService(
                 repository, securityEventRepository, authzClient, sequenceClient,
-                serviceTokenHolder, properties, objectMapper);
+                serviceTokenHolder, properties);
 
         CashSettlementInstruction instruction = InstructionTestFixtures.sampleInstruction("I-1");
         when(repository.getCurrent("I-1")).thenReturn(new VersionedInstruction(instruction, 1, Instant.now(), null));

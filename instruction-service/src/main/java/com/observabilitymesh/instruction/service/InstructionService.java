@@ -7,6 +7,7 @@ import com.observabilitymesh.common.model.Subject;
 import com.observabilitymesh.common.web.PermissionDeniedException;
 import com.observabilitymesh.instruction.config.InstructionProperties;
 import com.observabilitymesh.instruction.config.ServiceTokenHolder;
+import com.observabilitymesh.instruction.metrics.InstructionLifecycleMetrics;
 import com.observabilitymesh.instruction.model.CashSettlementInstruction;
 import com.observabilitymesh.instruction.model.InstructionAction;
 import com.observabilitymesh.instruction.model.InstructionRouteValidator;
@@ -48,6 +49,7 @@ public class InstructionService {
     private final ServiceTokenHolder serviceTokenHolder;
     private final InstructionProperties properties;
     private final ObjectMapper objectMapper;
+    private final InstructionLifecycleMetrics lifecycleMetrics;
 
     public InstructionService(
             InstructionRepository repository,
@@ -56,7 +58,8 @@ public class InstructionService {
             SequenceClient sequenceClient,
             ServiceTokenHolder serviceTokenHolder,
             InstructionProperties properties,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            InstructionLifecycleMetrics lifecycleMetrics) {
         this.repository = repository;
         this.securityEventRepository = securityEventRepository;
         this.authzClient = authzClient;
@@ -64,6 +67,7 @@ public class InstructionService {
         this.serviceTokenHolder = serviceTokenHolder;
         this.properties = properties;
         this.objectMapper = objectMapper;
+        this.lifecycleMetrics = lifecycleMetrics;
     }
 
     public VersionedInstruction create(
@@ -396,6 +400,7 @@ public class InstructionService {
                     action, subject, saved.instruction(), saved.versionNumber(), details, objectMapper);
             securityEventRepository.insert(event, eventId);
         }
+        lifecycleMetrics.recordTransition(action, saved.instruction().status(), saved.instruction().owningLob());
         return saved;
     }
 

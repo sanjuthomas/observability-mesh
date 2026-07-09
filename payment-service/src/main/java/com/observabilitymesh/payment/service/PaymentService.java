@@ -14,6 +14,7 @@ import com.observabilitymesh.payment.config.ServiceIdentity;
 import com.observabilitymesh.payment.ofac.OfacScanRequest;
 import com.observabilitymesh.payment.ofac.OfacScanRequestFactory;
 import com.observabilitymesh.payment.ofac.OfacScanRequestRepository;
+import com.observabilitymesh.payment.metrics.PaymentLifecycleMetrics;
 import com.observabilitymesh.payment.model.LifecycleEvent;
 import com.observabilitymesh.payment.model.Payment;
 import com.observabilitymesh.payment.model.PaymentAction;
@@ -61,6 +62,7 @@ public class PaymentService {
     private final ServiceIdentity serviceIdentity;
     private final PaymentProperties properties;
     private final ObjectMapper objectMapper;
+    private final PaymentLifecycleMetrics lifecycleMetrics;
     private final TransactionTemplate transactionTemplate;
 
     public PaymentService(
@@ -73,6 +75,7 @@ public class PaymentService {
             ServiceIdentity serviceIdentity,
             PaymentProperties properties,
             ObjectMapper objectMapper,
+            PaymentLifecycleMetrics lifecycleMetrics,
             @Qualifier("paymentTransactionTemplate") TransactionTemplate transactionTemplate) {
         this.repository = repository;
         this.securityEventRepository = securityEventRepository;
@@ -83,6 +86,7 @@ public class PaymentService {
         this.serviceIdentity = serviceIdentity;
         this.properties = properties;
         this.objectMapper = objectMapper;
+        this.lifecycleMetrics = lifecycleMetrics;
         this.transactionTemplate = transactionTemplate;
     }
 
@@ -473,6 +477,7 @@ public class PaymentService {
                     action, subject, saved.payment(), saved.versionNumber(), details);
             securityEventRepository.insert(event, eventId);
         }
+        lifecycleMetrics.recordTransition(action, saved.payment().status(), saved.payment().owningLob());
         return saved;
     }
 
@@ -493,6 +498,7 @@ public class PaymentService {
             OfacScanRequest ofacRequest = OfacScanRequestFactory.from(
                     saved.payment(), instruction, saved.versionNumber(), objectMapper);
             ofacScanRequestRepository.insert(ofacRequest);
+            lifecycleMetrics.recordTransition(action, saved.payment().status(), saved.payment().owningLob());
             return saved;
         });
     }

@@ -51,9 +51,9 @@ class InstructionServiceExcludedUserTest {
         InstructionProperties properties = new InstructionProperties(
                 "instructions", "security_events", "instruction_service",
                 "svc-instruction", "Password1!", "", "bot-001", "admin-001", 200);
-        instructionService = new InstructionService(
+        instructionService = InstructionServiceTestFixtures.instructionService(
                 repository, securityEventRepository, authzClient, sequenceClient,
-                serviceTokenHolder, properties, objectMapper);
+                serviceTokenHolder, properties);
     }
 
     @Test
