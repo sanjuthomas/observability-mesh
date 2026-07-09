@@ -4,7 +4,7 @@ Reference stack for **observability sovereignty without enterprise licensing** â
 
 The policy-aware SSI microservices platform is the **demo workload**: a trimmed Java port of [policy-pilot](https://github.com/sanjuthomas/policy-pilot) that exercises the catalog end-to-end. It generates realistic telemetry and business events (including sanction-scan latency) so you can see how the pieces fit together without building a production payments system first.
 
-OpenSLO documents are authored in `slo-author-service` (a Keycloak-secured Spring Boot service and browser UI in this monorepo). `slo-provisioner-service` compiles active SLOs through [Sloth](https://github.com/slok/sloth) into Prometheus recording rules for Grafana SLO dashboards (based on [Sloth dashboard 14348](https://grafana.com/grafana/dashboards/14348-sloth-slo/), provisioned automatically under **SLOs â†’ SLO Overview (Sloth)**) and exposes a read-only browser UI for provision status and generated rules.
+OpenSLO documents are authored in `slo-author-service` (a Keycloak-secured Spring Boot service and browser UI in this monorepo). `slo-provisioner-service` compiles active SLOs through [Sloth](https://github.com/slok/sloth) into Prometheus recording rules; Grafana loads the **SLO Overview (Sloth)** dashboard automatically under **SLOs**. The provisioner also exposes a read-only browser UI for provision status and generated rules.
 
 ## Why I built this
 
