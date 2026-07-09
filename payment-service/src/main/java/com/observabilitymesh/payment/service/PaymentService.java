@@ -31,10 +31,8 @@ import com.observabilitymesh.sequenceclient.SequenceClient;
 import com.observabilitymesh.sequenceclient.SequenceClientException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
@@ -63,7 +61,6 @@ public class PaymentService {
     private final PaymentProperties properties;
     private final ObjectMapper objectMapper;
     private final PaymentLifecycleMetrics lifecycleMetrics;
-    private final TransactionTemplate transactionTemplate;
 
     public PaymentService(
             PaymentRepository repository,
@@ -75,8 +72,7 @@ public class PaymentService {
             ServiceIdentity serviceIdentity,
             PaymentProperties properties,
             ObjectMapper objectMapper,
-            PaymentLifecycleMetrics lifecycleMetrics,
-            @Qualifier("paymentTransactionTemplate") TransactionTemplate transactionTemplate) {
+            PaymentLifecycleMetrics lifecycleMetrics) {
         this.repository = repository;
         this.securityEventRepository = securityEventRepository;
         this.ofacScanRequestRepository = ofacScanRequestRepository;
@@ -87,7 +83,6 @@ public class PaymentService {
         this.properties = properties;
         this.objectMapper = objectMapper;
         this.lifecycleMetrics = lifecycleMetrics;
-        this.transactionTemplate = transactionTemplate;
     }
 
     public VersionedPayment create(
@@ -487,20 +482,11 @@ public class PaymentService {
             Subject subject,
             Map<String, Object> details,
             JsonNode instruction) {
-        return transactionTemplate.execute(status -> {
-            VersionedPayment saved = repository.appendVersion(payment);
-            if (shouldRecordSecurityEvent(subject)) {
-                String eventId = securityEventRepository.allocateEventId(payment.paymentId());
-                PaymentSecurityEvent event = PaymentSecurityEvent.authorizedAction(
-                        action, subject, saved.payment(), saved.versionNumber(), details);
-                securityEventRepository.insert(event, eventId);
-            }
-            OfacScanRequest ofacRequest = OfacScanRequestFactory.from(
-                    saved.payment(), instruction, saved.versionNumber(), objectMapper);
-            ofacScanRequestRepository.insert(ofacRequest);
-            lifecycleMetrics.recordTransition(action, saved.payment().status(), saved.payment().owningLob());
-            return saved;
-        });
+        VersionedPayment saved = saveWithSecurityEvent(payment, action, subject, details, false);
+        OfacScanRequest ofacRequest = OfacScanRequestFactory.from(
+                saved.payment(), instruction, saved.versionNumber(), objectMapper);
+        ofacScanRequestRepository.insert(ofacRequest);
+        return saved;
     }
 
     private void recordEvent(Payment payment, PaymentAction action, Subject subject, Map<String, Object> details) {

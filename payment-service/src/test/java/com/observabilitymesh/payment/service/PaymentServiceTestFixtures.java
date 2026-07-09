@@ -12,11 +12,6 @@ import com.observabilitymesh.payment.ofac.OfacScanRequestRepository;
 import com.observabilitymesh.payment.repo.PaymentRepository;
 import com.observabilitymesh.payment.security.SecurityEventRepository;
 import com.observabilitymesh.sequenceclient.SequenceClient;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.TransactionDefinition;
-import org.springframework.transaction.support.AbstractPlatformTransactionManager;
-import org.springframework.transaction.support.DefaultTransactionStatus;
-import org.springframework.transaction.support.TransactionTemplate;
 
 import static org.mockito.Mockito.mock;
 
@@ -44,35 +39,12 @@ final class PaymentServiceTestFixtures {
                 serviceIdentity,
                 properties,
                 testObjectMapper(),
-                mock(PaymentLifecycleMetrics.class),
-                passthroughTransactionTemplate());
+                mock(PaymentLifecycleMetrics.class));
     }
 
     static ObjectMapper testObjectMapper() {
         return new ObjectMapper()
                 .registerModule(new JavaTimeModule())
                 .setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE);
-    }
-
-    static TransactionTemplate passthroughTransactionTemplate() {
-        PlatformTransactionManager txManager = new AbstractPlatformTransactionManager() {
-            @Override
-            protected Object doGetTransaction() {
-                return new Object();
-            }
-
-            @Override
-            protected void doBegin(Object transaction, TransactionDefinition definition) {
-            }
-
-            @Override
-            protected void doCommit(DefaultTransactionStatus status) {
-            }
-
-            @Override
-            protected void doRollback(DefaultTransactionStatus status) {
-            }
-        };
-        return new TransactionTemplate(txManager);
     }
 }

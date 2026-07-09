@@ -2,6 +2,7 @@ package com.observabilitymesh.payment.ofac;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.bson.Document;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Repository;
 import org.springframework.data.mongodb.core.MongoTemplate;
 
@@ -13,10 +14,10 @@ public class OfacScanRequestRepository {
     private final String collection;
 
     public OfacScanRequestRepository(
-            MongoTemplate ofacMongoTemplate,
+            @Qualifier("ofacMongoTemplate") MongoTemplate mongoTemplate,
             ObjectMapper paymentObjectMapper,
             com.observabilitymesh.payment.config.PaymentProperties properties) {
-        this.mongoTemplate = ofacMongoTemplate;
+        this.mongoTemplate = mongoTemplate;
         this.objectMapper = paymentObjectMapper;
         this.collection = properties.scanRequestsCollection();
     }
