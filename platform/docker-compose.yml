@@ -46,7 +46,7 @@ services:
       ALERTMANAGER_SMTP_USER: ${ALERTMANAGER_SMTP_USER:-}
       ALERTMANAGER_SMTP_PASSWORD: ${ALERTMANAGER_SMTP_PASSWORD:-}
       ALERTMANAGER_SMTP_REQUIRE_TLS: ${ALERTMANAGER_SMTP_REQUIRE_TLS:-true}
-      ALERTMANAGER_EMAIL_TO: ${ALERTMANAGER_EMAIL_TO:-observabilitymesh@sanju.org}
+      ALERTMANAGER_EMAIL_TO: ${ALERTMANAGER_EMAIL_TO:-you@example.com}
     volumes:
       - alertmanager-data:/alertmanager
     restart: unless-stopped

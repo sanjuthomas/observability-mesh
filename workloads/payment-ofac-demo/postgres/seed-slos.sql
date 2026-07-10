@@ -260,7 +260,7 @@ INSERT INTO service_level_objectives (
         "displayName": "Observability Mesh email"
       },
       "spec": {
-        "description": "Tenant email route via Alertmanager (observabilitymesh@sanju.org in demo).",
+        "description": "Tenant email route via Alertmanager (set ALERTMANAGER_EMAIL_TO to your email).",
         "target": "email"
       }
     }'::jsonb,

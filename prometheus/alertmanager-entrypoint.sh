@@ -10,7 +10,7 @@ CONFIG=/tmp/alertmanager.yml
 : "${ALERTMANAGER_SMTP_USER:=}"
 : "${ALERTMANAGER_SMTP_PASSWORD:=}"
 : "${ALERTMANAGER_SMTP_REQUIRE_TLS:=true}"
-: "${ALERTMANAGER_EMAIL_TO:=observabilitymesh@sanju.org}"
+: "${ALERTMANAGER_EMAIL_TO:=you@example.com}"
 
 sed \
   -e "s|\${ALERTMANAGER_SMTP_HOST}|${ALERTMANAGER_SMTP_HOST}|g" \

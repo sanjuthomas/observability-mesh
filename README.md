@@ -42,7 +42,7 @@ flowchart LR
     Tempo --> Grafana
     OS --> OSD["OpenSearch Dashboards"]
     Prom -->|PromQL alert rules| AM["Alertmanager"]
-    AM -->|email| Notify["observabilitymesh@sanju.org"]
+    AM -->|email| Notify["Your email"]
 
     subgraph SLO["SLO catalog"]
         SloAuth["slo-author-service"]
@@ -72,7 +72,7 @@ flowchart LR
     Tempo --> Grafana
     OS --> OSD["OpenSearch Dashboards"]
     Prom -->|evaluate alert rules| AM["Alertmanager"]
-    AM -->|SMTP email| Notify["observabilitymesh@sanju.org"]
+    AM -->|SMTP email| Notify["Your email"]
 ```
 
 ### Signal flow
@@ -127,7 +127,7 @@ flowchart LR
     Prov -->|POST reload| Prom
     Prom -->|ALERTS metric| Grafana
     Prom -->|firing alerts| AM
-    AM -->|email| Notify["observabilitymesh@sanju.org"]
+    AM -->|email| Notify["Your email"]
 ```
 
 1. Read active `kind=SLO` rows from `service_level_objectives`; resolve `spec.indicatorRef` to the active `kind=SLI` document.

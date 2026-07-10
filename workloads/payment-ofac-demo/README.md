@@ -69,7 +69,7 @@ flowchart LR
     Pay["payment-service"] -->|payment_security_events_total| OTel["otel-collector"]
     OTel --> Prom
     Prom --> AM["Alertmanager"]
-    AM --> Email["observabilitymesh@sanju.org"]
+    AM --> Email["Your email"]
     Pay -.->|audit only| Mongo[("MongoDB security_events")]
 ```
 
@@ -107,7 +107,7 @@ Wait ~60–90 seconds after payment approvals so OFAC scans finish and `sanction
 
 **Logs** — OpenSearch Dashboards http://localhost:5601 (index pattern `otel-logs*`)
 
-**Email alerts (metric-based)** — configure SMTP in `.env` (see `.env.example`). Alerts email **`observabilitymesh@sanju.org`** when Prometheus rules fire on OTLP metrics:
+**Email alerts (metric-based)** — configure SMTP in `.env` (see `.env.example`). Alerts email **Your email** when Prometheus rules fire on OTLP metrics:
 
 | Alert | Metric / rule | Trigger |
 |-------|---------------|---------|
