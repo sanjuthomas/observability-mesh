@@ -2,7 +2,7 @@
 
 **Observability Mesh** is a lightweight, vendor-free operating model for decentralized observability ownership. The core principle is simple: observability is part of the application — owned and operated by the team that ships it — not shared infrastructure that every service feeds into.
 
-This repository is a working reference for that model. It includes a composable open-source stack (logs, metrics, traces, SLO authoring) and a demo workload you can replace with your own services. Platform teams publish building blocks; application teams compose an isolated tenant alongside their app and own day-2 operations within that boundary.
+This repository is a reference implementation for **federated SRE ownership**: application teams get isolated observability tenants, while the platform team publishes the golden catalog, instrumentation contract, SLO workflow, and upgrade path. It includes a composable open-source stack (logs, metrics, traces, SLO authoring) and a demo workload you can replace with your own services.
 
 The default demo is [payment-ofac-demo](workloads/payment-ofac-demo/README.md). The root `docker-compose.yml` is a convenience shim to start it from the repo root.
 
