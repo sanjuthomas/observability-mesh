@@ -152,7 +152,7 @@ function clearStatus() {
 }
 
 function updateSaveButton() {
-  elements.saveBtn.disabled = !state.token || !state.dirty;
+  elements.saveBtn.disabled = !state.dirty;
 }
 
 function updateDocMeta() {
@@ -164,17 +164,17 @@ function updateDocMeta() {
 }
 
 async function api(path, options = {}) {
-  if (!state.token) {
-    throw new Error('Sign in required');
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(options.headers || {})
+  };
+  if (state.token) {
+    headers.Authorization = `Bearer ${state.token}`;
   }
 
   const response = await fetch(path, {
     ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${state.token}`,
-      ...(options.headers || {})
-    }
+    headers
   });
 
   if (response.status === 401) {
@@ -195,11 +195,6 @@ async function api(path, options = {}) {
 }
 
 async function refreshDocuments() {
-  if (!state.token) {
-    elements.documentList.innerHTML = '<p class="muted">Sign in to view documents.</p>';
-    return;
-  }
-
   try {
     state.documents = await api(DOCUMENTS_API);
     renderDocumentList();
@@ -385,6 +380,7 @@ async function saveDocument() {
 async function init() {
   startNewDocument();
   await restoreSession();
+  await refreshDocuments();
 }
 
 init();

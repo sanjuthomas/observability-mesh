@@ -97,10 +97,6 @@ function setLoadStatus(state, label) {
 }
 
 async function loadSlos() {
-  if (!AdminAuth.loadSession()) {
-    setLoadStatus("error", "Sign in required");
-    return;
-  }
   setLoadStatus("connecting", "Loading");
   try {
     const params = new URLSearchParams({
@@ -120,10 +116,6 @@ async function loadSlos() {
 }
 
 async function loadSlis() {
-  if (!AdminAuth.loadSession()) {
-    setLoadStatus("error", "Sign in required");
-    return;
-  }
   setLoadStatus("connecting", "Loading");
   try {
     const response = await AdminAuth.adminFetch(`/api/ui/slis?limit=${MAX_ROWS}`);
@@ -194,3 +186,6 @@ AdminAuth.bindAdminAuthPanel({
     connectStream();
   },
 });
+
+loadActiveTab();
+connectStream();

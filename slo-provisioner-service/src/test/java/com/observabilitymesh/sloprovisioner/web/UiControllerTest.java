@@ -37,7 +37,7 @@ class UiControllerTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(new UiController(provisionUiService, subjectResolver)).build();
+        mockMvc = MockMvcBuilders.standaloneSetup(new UiController(provisionUiService, subjectResolver, true)).build();
         when(subjectResolver.resolveActor(any())).thenReturn(admin);
     }
 
@@ -96,9 +96,14 @@ class UiControllerTest {
     }
 
     @Test
-    void apiUiSliNotFound() throws Exception {
-        when(provisionUiService.getSli("missing"))
-                .thenThrow(new ProvisionDocumentNotFoundException("SLI", "missing"));
-        mockMvc.perform(get("/api/ui/slis/missing")).andExpect(status().isNotFound());
+    void apiUiSlosOpenWhenAuthDisabled() throws Exception {
+        MockMvc openMvc = MockMvcBuilders.standaloneSetup(new UiController(provisionUiService, subjectResolver, false))
+                .build();
+        when(provisionUiService.listSlos("ALL", 200))
+                .thenReturn(List.of(Map.of("name", "demo-slo", "provision_status", "ACTIVE")));
+
+        openMvc.perform(get("/api/ui/slos"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(1));
     }
 }

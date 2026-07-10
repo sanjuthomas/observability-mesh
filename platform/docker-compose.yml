@@ -1,0 +1,231 @@
+# Shared observability mesh platform bundle.
+# Host ports are parameterized via the workload .env (see workloads/_template/.env.example).
+# Do not set container_name here — compose project name scopes containers and volumes per workload.
+
+x-otel-environment: &otel-environment
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+  OTEL_EXPORTER_OTLP_METRICS_URL: http://otel-collector:4318/v1/metrics
+  OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+  OTEL_EXPORTER_OTLP_INSECURE: "true"
+  OTEL_METRIC_EXPORT_STEP: 15s
+  OTEL_LOG_CONSOLE: "true"
+  OTEL_DEPLOYMENT_ENVIRONMENT: development
+  OTEL_METRIC_EXPORT_INTERVAL: "15000"
+  OTEL_INSTRUMENTATION_MONGO_ENABLED: "false"
+  OTEL_INSTRUMENTATION_SPRING_WEB_ENABLED: "false"
+
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.96.0
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ../otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
+    ports:
+      - "${OTEL_GRPC_PORT:-4317}:4317"
+      - "${OTEL_HTTP_PORT:-4318}:4318"
+      - "${OTEL_METRICS_PORT:-8889}:8889"
+    depends_on:
+      opensearch:
+        condition: service_healthy
+      tempo:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - observability-mesh-net
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-lifecycle
+    ports:
+      - "${PROMETHEUS_PORT:-9092}:9090"
+    volumes:
+      - ../prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-sloth-rules:/etc/prometheus/rules-sloth
+      - prometheus-data:/prometheus
+    depends_on:
+      otel-collector:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9090/-/healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - observability-mesh-net
+
+  tempo:
+    image: grafana/tempo:2.6.1
+    command: ["-config.file=/etc/tempo/tempo.yaml"]
+    volumes:
+      - ../tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
+      - tempo-data:/var/tempo
+    ports:
+      - "${TEMPO_PORT:-3200}:3200"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3200/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+    restart: unless-stopped
+    networks:
+      - observability-mesh-net
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_DEFAULT_THEME: light
+    volumes:
+      - ../grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../grafana/dashboards:/etc/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      prometheus:
+        condition: service_healthy
+      tempo:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    restart: unless-stopped
+    networks:
+      - observability-mesh-net
+
+  opensearch:
+    image: opensearchproject/opensearch:2.11.1
+    environment:
+      cluster.name: observability-mesh
+      node.name: opensearch
+      discovery.type: single-node
+      bootstrap.memory_lock: "true"
+      OPENSEARCH_JAVA_OPTS: -Xms512m -Xmx512m
+      DISABLE_SECURITY_PLUGIN: "true"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    ports:
+      - "${OPENSEARCH_PORT:-9200}:9200"
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -sf http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=5s || exit 1",
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - observability-mesh-net
+
+  opensearch-dashboards:
+    image: opensearchproject/opensearch-dashboards:2.11.1
+    environment:
+      OPENSEARCH_HOSTS: '["http://opensearch:9200"]'
+      DISABLE_SECURITY_DASHBOARDS_PLUGIN: "true"
+    ports:
+      - "${OPENSEARCH_DASHBOARDS_PORT:-5601}:5601"
+    depends_on:
+      opensearch:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - observability-mesh-net
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: open_slo
+      POSTGRES_USER: open_slo
+      POSTGRES_PASSWORD: open_slo
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ../postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U open_slo -d open_slo"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - observability-mesh-net
+
+  slo-author-service:
+    build:
+      context: ..
+      dockerfile: slo-author-service/Dockerfile
+    ports:
+      - "${SLO_AUTHOR_PORT:-9090}:9090"
+    environment:
+      <<: *otel-environment
+      OBSERVABILITY_MESH_AUTH_ENABLED: "false"
+      OTEL_SERVICE_NAME: slo-author-service
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/open_slo
+      SPRING_DATASOURCE_USERNAME: open_slo
+      SPRING_DATASOURCE_PASSWORD: open_slo
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - observability-mesh-net
+
+  slo-provisioner-service:
+    build:
+      context: ..
+      dockerfile: slo-provisioner-service/Dockerfile
+    ports:
+      - "${SLO_PROVISIONER_PORT:-9097}:9097"
+    environment:
+      <<: *otel-environment
+      OBSERVABILITY_MESH_AUTH_ENABLED: "false"
+      OTEL_SERVICE_NAME: slo-provisioner-service
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/open_slo
+      SPRING_DATASOURCE_USERNAME: open_slo
+      SPRING_DATASOURCE_PASSWORD: open_slo
+      PROMETHEUS_RULES_DIR: /rules
+      PROMETHEUS_RELOAD_URL: http://prometheus:9090/-/reload
+      SLO_PROVISIONER_WORK_DIR: /work
+      SLOTH_BINARY: /usr/local/bin/sloth
+    volumes:
+      - prometheus-sloth-rules:/rules
+    depends_on:
+      postgres:
+        condition: service_healthy
+      slo-author-service:
+        condition: service_started
+      prometheus:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - observability-mesh-net
+
+networks:
+  observability-mesh-net:
+
+volumes:
+  postgres-data:
+  opensearch-data:
+  prometheus-data:
+  prometheus-sloth-rules:
+  tempo-data:
+  grafana-data:
