@@ -192,7 +192,7 @@ Grafana: http://localhost:3000 (`admin` / `admin`). Host port follows the worklo
 2. Choose **service** and **SLO** from the dropdowns at the top
 3. Review objective, SLI attainment, burn rate, and error-budget panels
 
-Data appears after OpenSLO documents are seeded, `slo-provisioner-service` has generated Sloth rules (poll ~60s), and application metrics match the SLI PromQL. See your workload README for seed commands and service/SLO names.
+Data appears after OpenSLO documents are seeded, `slo-provisioner-service` has generated Sloth rules (poll ~60s), and application metrics match the SLI PromQL. Seed commands, service names, and SLO names are workload-specific — see your workload README.
 
 **Traces**
 
@@ -200,13 +200,11 @@ Data appears after OpenSLO documents are seeded, `slo-provisioner-service` has g
 2. **Search** → filter by **Service name** (`service.name` — matches each container's `OTEL_SERVICE_NAME`)
 3. Set the time range (e.g. **Last 15 minutes**), run the query, and open a trace for the span waterfall
 
-Generate traffic first (workload seed script or normal API calls). Only instrumented services export traces; the demo harness does not yet.
-
-For the default demo: seed with `./workloads/payment-ofac-demo/scripts/seed-demo-data.sh --seed-only`, then use service `payment-platform` on the SLO dashboard and trace services such as `payment-service` or `ofac-service` — [payment-ofac-demo README](workloads/payment-ofac-demo/README.md#explore-in-grafana).
+Generate traffic first (workload seed script or normal API calls). Only instrumented services export traces.
 
 **Email alerts (metric-based)**
 
-Alerts are driven by **Prometheus metrics and PromQL rules** — not OpenSearch logs or MongoDB audit queries.
+Alerts are driven by **Prometheus metrics and PromQL rules** — not log or audit-store queries.
 
 ```mermaid
 flowchart LR
@@ -219,20 +217,13 @@ flowchart LR
         Prov -->|burn-rate and alert rules| Prom
     end
     Prom -->|rule fires| AM["Alertmanager"]
-    AM -->|SMTP| Email["observabilitymesh@sanju.org"]
+    AM -->|SMTP| Email["tenant email"]
     Prom -->|ALERTS time series| Grafana["Grafana SLO dashboard"]
 ```
 
-Prometheus routes firing alerts to **Alertmanager** (http://localhost:9098 by default), which emails **`observabilitymesh@sanju.org`** when SMTP is configured.
+Prometheus routes firing alerts to **Alertmanager** (http://localhost:9098 by default). Configure SMTP in the workload `.env` (`ALERTMANAGER_SMTP_*`, `ALERTMANAGER_EMAIL_TO`). Without SMTP, alerts still appear in Prometheus and the Grafana SLO dashboard.
 
-| Alert | Metric / rule | Trigger |
-|-------|---------------|---------|
-| **SLO breach** | Sloth burn-rate rules (from OpenSLO `SLO` + `SLI` via slo-author → provisioner) | Error-budget burn rate exceeds Sloth thresholds |
-| **Payment approval security ALERT** | OpenSLO `AlertPolicy` + `AlertCondition` + `SLI` (`thresholdMetric` on `payment_security_events_total`) via slo-author → provisioner | Policy denies a payment `APPROVE`; counter incremented at denial time |
-
-The demo also writes `ALERT` security events to MongoDB for the browser UI — that audit trail is separate from the Prometheus counter that triggers email.
-
-Set SMTP credentials in the workload `.env` before `docker compose up` (see `workloads/payment-ofac-demo/.env.example`). Without SMTP, alerts still appear in Prometheus and the Grafana SLO dashboard; email delivery requires a reachable `ALERTMANAGER_SMTP_*` configuration.
+Workload-specific alert names, triggers, and verification steps live in that workload's README — for the default demo see [payment-ofac-demo Explore in Grafana](workloads/payment-ofac-demo/README.md#explore-in-grafana).
 
 ## Quick start
 

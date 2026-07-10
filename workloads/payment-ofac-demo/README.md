@@ -79,7 +79,9 @@ SLO breach and payment-approval security alerts both follow the catalog path abo
 
 ### Explore in Grafana
 
-Open http://localhost:3000 (`admin` / `admin`). Generic Grafana navigation is in the root [README](../../README.md#explore-in-grafana).
+Platform navigation (SLO Overview panels, Tempo Explore, Alertmanager) is in the root [README](../../README.md#explore-in-grafana). This section is the **payment-ofac-demo** walkthrough.
+
+Open http://localhost:3000 (`admin` / `admin`).
 
 **Seed demo data first** (stack must be running):
 
@@ -107,8 +109,10 @@ Wait ~60–90 seconds after payment approvals so OFAC scans finish and `sanction
 
 **Email alerts (metric-based)** — configure SMTP in `.env` (see `.env.example`). Alerts email **`observabilitymesh@sanju.org`** when Prometheus rules fire on OTLP metrics:
 
-- **SLO breach** — OpenSLO `SLO` + `SLI` in slo-author → Sloth burn-rate alert rules (`sloth_severity=ticket` or `page`)
-- **Payment approval security ALERT** — OpenSLO `AlertPolicy` + `AlertCondition` + `SLI` (`thresholdMetric` on `payment_security_events_total`) in slo-author → provisioner `alert-payment-approval-security-alert.yml`
+| Alert | Metric / rule | Trigger |
+|-------|---------------|---------|
+| **SLO breach** | Sloth burn-rate rules (`sloth_severity=ticket` or `page`) from OpenSLO `SLO` + `SLI` | Error-budget burn rate exceeds Sloth thresholds |
+| **Payment approval security ALERT** | OpenSLO `AlertPolicy` + `AlertCondition` + `SLI` (`thresholdMetric` on `payment_security_events_total`) → provisioner `alert-payment-approval-security-alert.yml` | Policy denies a payment `APPROVE`; counter incremented at denial time |
 
 MongoDB `security_events` documents power the browser UI; the email alert uses the Prometheus counter, not a log or DB query.
 
