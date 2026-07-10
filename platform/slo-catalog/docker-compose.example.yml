@@ -9,7 +9,7 @@ name: slo-catalog-example
 
 services:
   slo-catalog:
-    image: ghcr.io/sanjuthomas/observability-mesh-slo-catalog:0.1.0
+    image: sanjuthomas/observability-mesh-slo-catalog:0.1.0
     build:
       context: ../..
       dockerfile: platform/slo-catalog/Dockerfile
