@@ -56,13 +56,33 @@ Docker Compose sets `OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318` and
 
 This workload overrides platform SLO services to enable Keycloak JWT auth and seeds OpenSLO documents via `postgres/seed-slos.sql`. The provisioner datasource allowlist is `payment-prometheus` (set in `docker-compose.yml`).
 
-### Try it
+### Explore in Grafana
 
-1. Start the stack and seed demo data: `./scripts/seed-demo-data.sh`
-2. Open Grafana → **Dashboards** → **SLOs** → **SLO Overview (Sloth)** — select service `payment-platform` to view sanction-scan SLO burn rate and error budget
-3. Open Grafana → **Explore** → **Prometheus** — e.g. `rate(http_server_requests_seconds_count{service_name="instruction-service"}[5m])`
-4. Open Grafana → **Explore** → **Tempo** — search by `service.name` (e.g. `instruction-service`)
-5. For logs, use OpenSearch Dashboards (index pattern `otel-logs*`)
+Open http://localhost:3000 (`admin` / `admin`). Generic Grafana navigation is in the root [README](../../README.md#explore-in-grafana).
+
+**Seed demo data first** (stack must be running):
+
+```bash
+./scripts/seed-demo-data.sh --seed-only
+```
+
+Wait ~60–90 seconds after payment approvals so OFAC scans finish and `sanction_scan_completed_total` metrics reach Prometheus.
+
+**SLO dashboard**
+
+1. **Dashboards** → **SLOs** → **SLO Overview (Sloth)**
+2. **service** = `payment-platform`
+3. **SLO** = `sanction-scan-completion-30d-0` or `sanction-scan-latency-30d-0`
+
+**Traces**
+
+1. **Explore** → **Tempo** → **Search**
+2. **Service name** — try `payment-service`, `ofac-service`, or `instruction-service`
+3. Time range **Last 15 minutes** (or **Last 1 hour** if scans ran earlier)
+
+**Metrics** (optional) — **Explore** → **Prometheus**: `rate(http_server_requests_seconds_count{service_name="instruction-service"}[5m])`
+
+**Logs** — OpenSearch Dashboards http://localhost:5601 (index pattern `otel-logs*`)
 
 `demo-harness` is not on the shared telemetry module yet.
 

@@ -167,6 +167,28 @@ In this repo, each workload **includes** the shared platform compose ([platform/
 
 See [workloads/_template/README.md](workloads/_template/README.md) for running multiple isolated tenants in parallel (`PORT_BLOCK` port offsets).
 
+### Explore in Grafana
+
+Grafana: http://localhost:3000 (`admin` / `admin`). Host port follows the workload `.env` (`GRAFANA_PORT`; default `3000` with `PORT_BLOCK=0`).
+
+**SLO dashboard**
+
+1. **Dashboards** → **SLOs** → **SLO Overview (Sloth)**
+2. Choose **service** and **SLO** from the dropdowns at the top
+3. Review objective, SLI attainment, burn rate, and error-budget panels
+
+Data appears after OpenSLO documents are seeded, `slo-provisioner-service` has generated Sloth rules (poll ~60s), and application metrics match the SLI PromQL. See your workload README for seed commands and service/SLO names.
+
+**Traces**
+
+1. **Explore** (compass icon) → datasource **Tempo**
+2. **Search** → filter by **Service name** (`service.name` — matches each container's `OTEL_SERVICE_NAME`)
+3. Set the time range (e.g. **Last 15 minutes**), run the query, and open a trace for the span waterfall
+
+Generate traffic first (workload seed script or normal API calls). Only instrumented services export traces; the demo harness does not yet.
+
+For the default demo: seed with `./workloads/payment-ofac-demo/scripts/seed-demo-data.sh --seed-only`, then use service `payment-platform` on the SLO dashboard and trace services such as `payment-service` or `ofac-service` — [payment-ofac-demo README](workloads/payment-ofac-demo/README.md#explore-in-grafana).
+
 ## Quick start
 
 **Default demo workload** (platform + SSI payment/OFAC services):
