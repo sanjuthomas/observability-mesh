@@ -72,7 +72,7 @@ public class OfacScanProcessor {
     }
 
     private void scheduleCompletion(OfacScanRequestRef inProgress) {
-        long delayMs = scanDelayMs();
+        long delayMs = scanDelayMs(inProgress);
         scanExecutor.execute(() -> completeAfterDelay(inProgress, delayMs));
     }
 
@@ -84,7 +84,7 @@ public class OfacScanProcessor {
             if (delayMs > 0) {
                 TimeUnit.MILLISECONDS.sleep(delayMs);
             }
-            OfacScanResult result = pickResult();
+            OfacScanResult result = pickResult(inProgress);
             OfacScanRequestRef processed = repository.transition(
                     inProgress.paymentId(),
                     inProgress.paymentVersion(),
@@ -104,20 +104,12 @@ public class OfacScanProcessor {
         }
     }
 
-    long scanDelayMs() {
-        long min = properties.minScanDelayMs();
-        long max = properties.maxScanDelayMs();
-        if (max <= min) {
-            return min;
-        }
-        return min + random.nextLong(max - min + 1);
+    long scanDelayMs(OfacScanRequestRef request) {
+        return OfacScanMutator.scanDelayMs(properties, request, random);
     }
 
-    OfacScanResult pickResult() {
-        if (random.nextInt(100) == 0) {
-            return OfacScanResult.UNABLE_TO_DETERMINE;
-        }
-        return random.nextBoolean() ? OfacScanResult.PASSED : OfacScanResult.FAILED;
+    OfacScanResult pickResult(OfacScanRequestRef request) {
+        return OfacScanMutator.pickResult(properties, request, random);
     }
 
     private void recordCompletionMetric(OfacScanRequestRef inProgress, OfacScanResult result) {

@@ -114,7 +114,47 @@ MongoDB `security_events` documents power the browser UI; the email alert uses t
 
 Trigger a payment approval alert with the harness payment policy scenario: `./scripts/seed-demo-data.sh --seed-only` (includes `run-payment-policy-scenario`). Alertmanager UI: http://localhost:9098.
 
-`demo-harness` is not on the shared telemetry module yet.
+The harness is a **traffic generator** only — it is intentionally not instrumented for OTLP metrics, traces, or logs. Observability comes from the services it exercises.
+
+### Trigger an SLO breach (demo)
+
+`ofac-service` supports **demo mutants** that skew scan timing and results so seeded OpenSLO SLOs breach on purpose.
+
+| Mutant mode | Env value | Effect |
+|-------------|-----------|--------|
+| Off (default) | `off` | Normal simulator (~1% `UNABLE_TO_DETERMINE`, 30–60s scan delay) |
+| Latency | `latency` | Scans take **90–120s** → misses `duration_le="60s"` on `sanction-scan-latency-30d` |
+| Completion | `completion` | **15%** `UNABLE_TO_DETERMINE` → breaches `sanction-scan-completion-30d` (99% target) |
+| Both | `both` | Latency + completion mutants together |
+
+1. In `.env` (see `.env.example`):
+
+```bash
+OBSERVABILITY_MESH_OFAC_MUTANT_MODE=both
+```
+
+2. Rebuild and restart OFAC:
+
+```bash
+docker compose up -d --build ofac-service
+```
+
+3. Generate OFAC traffic (approve payments so scan requests are created):
+
+```bash
+./scripts/seed-demo-data.sh --seed-only
+```
+
+4. Wait **2–3 minutes** for scans to finish and metrics to reach Prometheus.
+
+5. In Grafana → **SLOs** → **SLO Overview (Sloth)**:
+   - **service** = `payment-platform`
+   - **SLO** = `sanction-scan-latency-30d-0` or `sanction-scan-completion-30d-0`
+   - Time range **Last 30 minutes**
+
+Optional: set `OBSERVABILITY_MESH_OFAC_MUTANT_PAYMENT_ID_PREFIX` to limit mutants to matching `payment_id` values only.
+
+Prometheus check: `sum by (result, duration_le) (increase(sanction_scan_completed_total[5m]))`
 
 ## Sanction scanning (OFAC)
 
@@ -128,8 +168,10 @@ When a payment is **approved**, `payment-service` writes three documents in a **
 
 1. reads all **current** scan requests with `lifecycle_status = OPEN`,
 2. claims each by appending a new version with `lifecycle_status = IN_PROGRESS`,
-3. simulates the scan by waiting **30–60 seconds**, then
+3. simulates the scan by waiting **30–60 seconds** (or **90–120s** when latency mutants are enabled), then
 4. appends a final version with `lifecycle_status = PROCESSED` and a `result` of `PASSED` or `FAILED`.
+
+Demo mutants (`observability-mesh.ofac.mutant-mode`) can raise the `UNABLE_TO_DETERMINE` rate and slow scans — see [Trigger an SLO breach (demo)](#trigger-an-slo-breach-demo).
 
 Scan requests are versioned bitemporally (`in` / `out`, current sentinel `9999-12-31T23:59:59Z`) with `_id = {paymentId}|{paymentVersion}|{versionNumber}`, so each lifecycle transition is a new immutable version:
 

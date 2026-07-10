@@ -1,5 +1,6 @@
 package com.observabilitymesh.ofac.service;
 
+import com.observabilitymesh.ofac.config.OfacMutantMode;
 import com.observabilitymesh.ofac.config.OfacProperties;
 import com.observabilitymesh.ofac.metrics.SanctionScanMetrics;
 import com.observabilitymesh.ofac.model.OfacScanLifecycleStatus;
@@ -37,10 +38,17 @@ class OfacScanProcessorTest {
 
     private OfacScanProcessor processor;
 
+    private static final OfacScanRequestRef REQUEST =
+            new OfacScanRequestRef("P-1", 2, 1, REQUESTED_AT);
+
     @BeforeEach
     void setUp() {
-        OfacProperties properties = new OfacProperties("scan-requests", 30_000, 0, 0);
+        OfacProperties properties = baselineProperties();
         processor = new OfacScanProcessor(repository, properties, Runnable::run, random, sanctionScanMetrics);
+    }
+
+    private static OfacProperties baselineProperties() {
+        return new OfacProperties("scan-requests", 30_000, 0, 0, OfacMutantMode.OFF, "", 15, 90_000, 120_000);
     }
 
     @Test
@@ -86,30 +94,31 @@ class OfacScanProcessorTest {
 
     @Test
     void scanDelayUsesConfiguredRange() {
-        OfacProperties properties = new OfacProperties("scan-requests", 30_000, 30_000, 60_000);
+        OfacProperties properties = new OfacProperties(
+                "scan-requests", 30_000, 30_000, 60_000, OfacMutantMode.OFF, "", 15, 90_000, 120_000);
         OfacScanProcessor rangedProcessor = new OfacScanProcessor(
                 repository, properties, Runnable::run, random, sanctionScanMetrics);
         when(random.nextLong(30_001)).thenReturn(5_000L);
 
-        assertThat(rangedProcessor.scanDelayMs()).isEqualTo(35_000);
+        assertThat(rangedProcessor.scanDelayMs(REQUEST)).isEqualTo(35_000);
     }
 
     @Test
     void scanDelayReturnsMinWhenRangeCollapsed() {
-        assertThat(processor.scanDelayMs()).isZero();
+        assertThat(processor.scanDelayMs(REQUEST)).isZero();
     }
 
     @Test
     void pickResultAlternatesBetweenPassedAndFailed() {
         when(random.nextInt(100)).thenReturn(1);
         when(random.nextBoolean()).thenReturn(false);
-        assertThat(processor.pickResult()).isEqualTo(OfacScanResult.FAILED);
+        assertThat(processor.pickResult(REQUEST)).isEqualTo(OfacScanResult.FAILED);
     }
 
     @Test
     void pickResultReturnsUnableToDetermineRoughlyOnePercent() {
         when(random.nextInt(100)).thenReturn(0);
-        assertThat(processor.pickResult()).isEqualTo(OfacScanResult.UNABLE_TO_DETERMINE);
+        assertThat(processor.pickResult(REQUEST)).isEqualTo(OfacScanResult.UNABLE_TO_DETERMINE);
     }
 
     @Test

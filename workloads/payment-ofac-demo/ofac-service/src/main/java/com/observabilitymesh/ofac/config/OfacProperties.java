@@ -7,6 +7,18 @@ public record OfacProperties(
         String scanRequestsCollection,
         long pollIntervalMs,
         long minScanDelayMs,
-        long maxScanDelayMs
+        long maxScanDelayMs,
+        OfacMutantMode mutantMode,
+        String mutantPaymentIdPrefix,
+        int mutantUnableToDeterminePercent,
+        long mutantMinScanDelayMs,
+        long mutantMaxScanDelayMs
 ) {
+    public OfacMutantMode mutantMode() {
+        return mutantMode == null ? OfacMutantMode.OFF : mutantMode;
+    }
+
+    public String mutantPaymentIdPrefix() {
+        return mutantPaymentIdPrefix == null ? "" : mutantPaymentIdPrefix;
+    }
 }

@@ -1,5 +1,6 @@
 package com.observabilitymesh.ofac.repo;
 
+import com.observabilitymesh.ofac.config.OfacMutantMode;
 import com.observabilitymesh.ofac.config.OfacProperties;
 import com.observabilitymesh.ofac.model.OfacScanLifecycleStatus;
 import com.observabilitymesh.ofac.model.OfacScanRequestConstants;
@@ -35,7 +36,8 @@ class OfacScanRequestRepositoryTest {
 
     @BeforeEach
     void setUp() {
-        OfacProperties properties = new OfacProperties("scan-requests", 30_000, 30_000, 60_000);
+        OfacProperties properties = new OfacProperties(
+                "scan-requests", 30_000, 30_000, 60_000, OfacMutantMode.OFF, "", 15, 90_000, 120_000);
         repository = new OfacScanRequestRepository(mongoTemplate, properties);
     }
 
