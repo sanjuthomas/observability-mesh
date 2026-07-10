@@ -1,0 +1,9 @@
+FROM prom/alertmanager:v0.27.0
+
+USER root
+COPY prometheus/alertmanager.yml.template /etc/alertmanager/alertmanager.yml.template
+COPY prometheus/alertmanager-entrypoint.sh /etc/alertmanager/alertmanager-entrypoint.sh
+RUN chmod +x /etc/alertmanager/alertmanager-entrypoint.sh
+USER nobody
+
+ENTRYPOINT ["/etc/alertmanager/alertmanager-entrypoint.sh"]

@@ -129,7 +129,13 @@ harness_scenario_loop() {
 
 print_mongo_alert_counts() {
   log "MongoDB security event ALERT counts"
-  docker exec mongodb mongosh --quiet security_events --eval '
+  local mongo_id
+  mongo_id="$(cd "${REPO_ROOT}/workloads/payment-ofac-demo" && docker compose ps -q mongodb)"
+  if [[ -z "${mongo_id}" ]]; then
+    echo "  (mongodb container not running — skipping counts)"
+    return 0
+  fi
+  docker exec "${mongo_id}" mongosh --quiet security_events --eval '
 const inst = db["instruction_service"];
 const pay = db["payment_service"];
 printjson({

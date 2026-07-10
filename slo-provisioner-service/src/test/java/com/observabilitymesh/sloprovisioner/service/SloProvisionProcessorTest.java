@@ -108,6 +108,7 @@ class SloProvisionProcessorTest {
         OpenSloDocumentView slo = sloDocument();
         OpenSloDocumentView sli = sliDocument();
         when(openSloDocumentRepository.listActiveByKind("SLO")).thenReturn(List.of(slo));
+        when(openSloDocumentRepository.listActiveByKind("AlertPolicy")).thenReturn(List.of());
         when(openSloDocumentRepository.findActiveByKindAndName("SLI", "sanction-scan-under-one-minute"))
                 .thenReturn(Optional.of(sli));
         when(provisionStateRepository.listByStatus(ProvisionStatus.ACTIVE)).thenReturn(List.of());
@@ -125,6 +126,7 @@ class SloProvisionProcessorTest {
     @Test
     void pollSurvivesPrometheusReloadFailure() {
         when(openSloDocumentRepository.listActiveByKind("SLO")).thenReturn(List.of());
+        when(openSloDocumentRepository.listActiveByKind("AlertPolicy")).thenReturn(List.of());
         when(provisionStateRepository.listByStatus(ProvisionStatus.ACTIVE))
                 .thenReturn(List.of(new SloProvisionState(
                         "openslo/v1/SLO/removed", 1, ProvisionStatus.ACTIVE, "removed.yml",
@@ -251,6 +253,7 @@ class SloProvisionProcessorTest {
     @Test
     void pollArchivesRemovedActiveSlo() {
         when(openSloDocumentRepository.listActiveByKind("SLO")).thenReturn(List.of());
+        when(openSloDocumentRepository.listActiveByKind("AlertPolicy")).thenReturn(List.of());
         SloProvisionState active = new SloProvisionState(
                 "openslo/v1/SLO/removed",
                 2,
@@ -267,6 +270,239 @@ class SloProvisionProcessorTest {
                 state -> state.logicalKey().equals("openslo/v1/SLO/removed")
                         && state.status() == ProvisionStatus.ARCHIVED));
         verify(prometheusReloader).reload();
+    }
+
+    @Test
+    void pollArchivesRemovedActiveAlertPolicy() {
+        when(openSloDocumentRepository.listActiveByKind("SLO")).thenReturn(List.of());
+        when(openSloDocumentRepository.listActiveByKind("AlertPolicy")).thenReturn(List.of());
+        SloProvisionState active = new SloProvisionState(
+                "openslo/v1/AlertPolicy/payment-approval-security-alert",
+                1,
+                ProvisionStatus.ACTIVE,
+                "alert-payment-approval-security-alert.yml",
+                "hash",
+                Instant.now(),
+                null);
+        when(provisionStateRepository.listByStatus(ProvisionStatus.ACTIVE)).thenReturn(List.of(active));
+
+        processor.pollAndProvision();
+
+        verify(provisionStateRepository).upsert(org.mockito.ArgumentMatchers.argThat(
+                state -> state.logicalKey().equals("openslo/v1/AlertPolicy/payment-approval-security-alert")
+                        && state.status() == ProvisionStatus.ARCHIVED));
+        verify(prometheusReloader).reload();
+    }
+
+    @Test
+    void syncActiveAlertPolicyFailsWhenConditionMissing() {
+        OpenSloDocumentView policy = alertPolicyDocument();
+        when(openSloDocumentRepository.findActiveByKindAndName("AlertCondition", "payment-approval-security-condition"))
+                .thenReturn(Optional.empty());
+
+        assertThat(processor.syncActiveAlertPolicy(policy)).isFalse();
+        verify(provisionStateRepository).upsert(org.mockito.ArgumentMatchers.argThat(
+                state -> state.status() == ProvisionStatus.FAILED));
+    }
+
+    @Test
+    void syncActiveAlertPolicySkipsWhenUnchanged() throws Exception {
+        OpenSloDocumentView policy = alertPolicyDocument();
+        OpenSloDocumentView condition = alertConditionDocument();
+        OpenSloDocumentView sli = alertSliDocument();
+        when(openSloDocumentRepository.findActiveByKindAndName("AlertCondition", "payment-approval-security-condition"))
+                .thenReturn(Optional.of(condition));
+        when(openSloDocumentRepository.findActiveByKindAndName("SLI", "payment-approval-security-sli"))
+                .thenReturn(Optional.of(sli));
+
+        assertThat(processor.syncActiveAlertPolicy(policy)).isTrue();
+        String rulesYaml = Files.readString(
+                rulesFileManager.alertPolicyRulesPath("payment-approval-security-alert"));
+        String contentHash = new ContentHasher().sha256(rulesYaml);
+        when(provisionStateRepository.findByLogicalKey(policy.logicalKey()))
+                .thenReturn(new SloProvisionState(
+                        policy.logicalKey(),
+                        1,
+                        ProvisionStatus.ACTIVE,
+                        "alert-payment-approval-security-alert.yml",
+                        contentHash,
+                        Instant.now(),
+                        null));
+
+        assertThat(processor.syncActiveAlertPolicy(policy)).isFalse();
+    }
+
+    @Test
+    void syncActiveAlertPolicyFailsWhenSliRefMissing() {
+        OpenSloDocumentView policy = alertPolicyDocument();
+        OpenSloDocumentView condition = new OpenSloDocumentView(
+                "11",
+                "openslo/v1/AlertCondition/payment-approval-security-condition",
+                1,
+                false,
+                "AlertCondition",
+                "payment-approval-security-condition",
+                Map.of(
+                        "metadata", Map.of(
+                                "name", "payment-approval-security-condition",
+                                "annotations", Map.of(
+                                        com.observabilitymesh.sloprovisioner.compile.OpenSloMetricAlertCompiler.METRIC_THRESHOLD_ANNOTATION,
+                                        com.observabilitymesh.sloprovisioner.compile.OpenSloMetricAlertCompiler.METRIC_THRESHOLD_VALUE)),
+                        "spec", Map.of(
+                                "condition", Map.of(
+                                        "kind", "burnrate",
+                                        "op", "gt",
+                                        "threshold", 0))));
+        when(openSloDocumentRepository.findActiveByKindAndName("AlertCondition", "payment-approval-security-condition"))
+                .thenReturn(Optional.of(condition));
+
+        assertThat(processor.syncActiveAlertPolicy(policy)).isFalse();
+        verify(provisionStateRepository).upsert(org.mockito.ArgumentMatchers.argThat(
+                state -> state.status() == ProvisionStatus.FAILED
+                        && state.lastError() != null
+                        && state.lastError().contains("observability-mesh.sli-ref")));
+    }
+
+    @Test
+    void syncActiveAlertPolicyFailsWhenSliMissing() {
+        OpenSloDocumentView policy = alertPolicyDocument();
+        OpenSloDocumentView condition = alertConditionDocument();
+        when(openSloDocumentRepository.findActiveByKindAndName("AlertCondition", "payment-approval-security-condition"))
+                .thenReturn(Optional.of(condition));
+        when(openSloDocumentRepository.findActiveByKindAndName("SLI", "payment-approval-security-sli"))
+                .thenReturn(Optional.empty());
+
+        assertThat(processor.syncActiveAlertPolicy(policy)).isFalse();
+        verify(provisionStateRepository).upsert(org.mockito.ArgumentMatchers.argThat(
+                state -> state.status() == ProvisionStatus.FAILED
+                        && state.lastError() != null
+                        && state.lastError().contains("active SLI not found")));
+    }
+
+    @Test
+    void pollDoesNotArchiveActiveAlertPolicyAsSlo() {
+        OpenSloDocumentView policy = alertPolicyDocument();
+        OpenSloDocumentView condition = alertConditionDocument();
+        OpenSloDocumentView sli = alertSliDocument();
+        SloProvisionState activeAlertPolicy = new SloProvisionState(
+                policy.logicalKey(),
+                1,
+                ProvisionStatus.ACTIVE,
+                "alert-payment-approval-security-alert.yml",
+                "hash",
+                Instant.now(),
+                null);
+
+        when(openSloDocumentRepository.listActiveByKind("SLO")).thenReturn(List.of());
+        when(openSloDocumentRepository.listActiveByKind("AlertPolicy")).thenReturn(List.of(policy));
+        when(openSloDocumentRepository.findActiveByKindAndName("AlertCondition", "payment-approval-security-condition"))
+                .thenReturn(Optional.of(condition));
+        when(openSloDocumentRepository.findActiveByKindAndName("SLI", "payment-approval-security-sli"))
+                .thenReturn(Optional.of(sli));
+        when(provisionStateRepository.listByStatus(ProvisionStatus.ACTIVE)).thenReturn(List.of(activeAlertPolicy));
+        when(provisionStateRepository.findByLogicalKey(policy.logicalKey())).thenReturn(activeAlertPolicy);
+
+        processor.pollAndProvision();
+
+        verify(provisionStateRepository, never()).upsert(org.mockito.ArgumentMatchers.argThat(
+                state -> state.logicalKey().equals(policy.logicalKey())
+                        && state.status() == ProvisionStatus.ARCHIVED));
+    }
+
+    @Test
+    void pollProvisionsActiveAlertPolicy() {
+        OpenSloDocumentView policy = alertPolicyDocument();
+        OpenSloDocumentView condition = alertConditionDocument();
+        OpenSloDocumentView sli = alertSliDocument();
+        when(openSloDocumentRepository.listActiveByKind("SLO")).thenReturn(List.of());
+        when(openSloDocumentRepository.listActiveByKind("AlertPolicy")).thenReturn(List.of(policy));
+        when(openSloDocumentRepository.findActiveByKindAndName("AlertCondition", "payment-approval-security-condition"))
+                .thenReturn(Optional.of(condition));
+        when(openSloDocumentRepository.findActiveByKindAndName("SLI", "payment-approval-security-sli"))
+                .thenReturn(Optional.of(sli));
+        when(provisionStateRepository.listByStatus(ProvisionStatus.ACTIVE)).thenReturn(List.of());
+        when(provisionStateRepository.findByLogicalKey(policy.logicalKey())).thenReturn(null);
+
+        processor.pollAndProvision();
+
+        verify(prometheusReloader).reload();
+    }
+
+    @Test
+    void syncActiveAlertPolicyPublishesPrometheusRules() throws Exception {
+        OpenSloDocumentView policy = alertPolicyDocument();
+        OpenSloDocumentView condition = alertConditionDocument();
+        OpenSloDocumentView sli = alertSliDocument();
+        when(openSloDocumentRepository.findActiveByKindAndName("AlertCondition", "payment-approval-security-condition"))
+                .thenReturn(Optional.of(condition));
+        when(openSloDocumentRepository.findActiveByKindAndName("SLI", "payment-approval-security-sli"))
+                .thenReturn(Optional.of(sli));
+        when(provisionStateRepository.findByLogicalKey(policy.logicalKey())).thenReturn(null);
+
+        assertThat(processor.syncActiveAlertPolicy(policy)).isTrue();
+        assertThat(Files.exists(rulesFileManager.alertPolicyRulesPath("payment-approval-security-alert"))).isTrue();
+    }
+
+    private static OpenSloDocumentView alertPolicyDocument() {
+        return new OpenSloDocumentView(
+                "10",
+                "openslo/v1/AlertPolicy/payment-approval-security-alert",
+                1,
+                false,
+                "AlertPolicy",
+                "payment-approval-security-alert",
+                Map.of(
+                        "spec", Map.of(
+                                "description", "Payment approval security alert",
+                                "alertWhenBreaching", true,
+                                "alertWhenResolved", true,
+                                "alertWhenNoData", false,
+                                "conditions", List.of(Map.of("conditionRef", "payment-approval-security-condition")),
+                                "notificationTargets", List.of(Map.of("targetRef", "observability-mesh-email")))));
+    }
+
+    private static OpenSloDocumentView alertConditionDocument() {
+        return new OpenSloDocumentView(
+                "11",
+                "openslo/v1/AlertCondition/payment-approval-security-condition",
+                1,
+                false,
+                "AlertCondition",
+                "payment-approval-security-condition",
+                Map.of(
+                        "metadata", Map.of(
+                                "name", "payment-approval-security-condition",
+                                "annotations", Map.of(
+                                        com.observabilitymesh.sloprovisioner.compile.OpenSloMetricAlertCompiler.METRIC_THRESHOLD_ANNOTATION,
+                                        com.observabilitymesh.sloprovisioner.compile.OpenSloMetricAlertCompiler.METRIC_THRESHOLD_VALUE,
+                                        com.observabilitymesh.sloprovisioner.compile.OpenSloMetricAlertCompiler.SLI_REF_ANNOTATION,
+                                        "payment-approval-security-sli")),
+                        "spec", Map.of(
+                                "severity", "page",
+                                "condition", Map.of(
+                                        "kind", "burnrate",
+                                        "op", "gt",
+                                        "threshold", 0,
+                                        "lookbackWindow", "5m",
+                                        "alertAfter", "0m"))));
+    }
+
+    private static OpenSloDocumentView alertSliDocument() {
+        return new OpenSloDocumentView(
+                "12",
+                "openslo/v1/SLI/payment-approval-security-sli",
+                1,
+                false,
+                "SLI",
+                "payment-approval-security-sli",
+                Map.of(
+                        "spec", Map.of(
+                                "thresholdMetric", Map.of(
+                                        "metricSource", Map.of(
+                                                "metricSourceRef", "payment-prometheus",
+                                                "spec", Map.of(
+                                                        "query",
+                                                        "sum(increase(payment_security_events_total{action=\"APPROVE\",severity=\"ALERT\"}[5m]))"))))));
     }
 
     private static OpenSloDocumentView sloDocument() {

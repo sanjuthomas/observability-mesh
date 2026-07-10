@@ -27,18 +27,37 @@ public class RulesFileManager {
     }
 
     public void publishActiveRules(String sloName, Path generatedRules) throws IOException {
-        Path target = activeRulesPath(sloName);
+        publishRules(activeRulesPath(sloName), generatedRules);
+    }
+
+    public Path alertPolicyRulesPath(String policyName) {
+        return rulesDir.resolve("alert-" + safeFileName(policyName) + ".yml");
+    }
+
+    public void publishAlertPolicyRules(String policyName, Path generatedRules) throws IOException {
+        publishRules(alertPolicyRulesPath(policyName), generatedRules);
+    }
+
+    public void archiveAlertPolicyRules(String policyName) throws IOException {
+        moveRulesFileToArchive("alert-" + safeFileName(policyName));
+    }
+
+    private void publishRules(Path target, Path generatedRules) throws IOException {
         Files.createDirectories(target.getParent());
         Files.copy(generatedRules, target, StandardCopyOption.REPLACE_EXISTING);
     }
 
-    public void archiveRules(String sloName) throws IOException {
-        Path active = activeRulesPath(sloName);
+    private void moveRulesFileToArchive(String fileBase) throws IOException {
+        Path active = rulesDir.resolve(fileBase + ".yml");
         if (!Files.exists(active)) {
             return;
         }
-        Path archived = archiveDir.resolve(safeFileName(sloName) + ".yml");
+        Path archived = archiveDir.resolve(fileBase + ".yml");
         Files.move(active, archived, StandardCopyOption.REPLACE_EXISTING);
+    }
+
+    public void archiveRules(String sloName) throws IOException {
+        moveRulesFileToArchive(safeFileName(sloName));
     }
 
     public Optional<String> readActiveRulesContent(String sloName) {

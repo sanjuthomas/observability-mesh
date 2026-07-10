@@ -14,7 +14,8 @@ Each workload compose project gets its **own** collector, Prometheus, Tempo, Gra
 | Service | Default host port | Role |
 |---------|-------------------|------|
 | `otel-collector` | 4317 (gRPC), 4318 (HTTP), 8889 (metrics) | OTLP ingest; fans out logs, metrics, traces |
-| `prometheus` | 9092 | Metrics TSDB; scrapes collector `:8889` |
+| `prometheus` | 9092 | Metrics TSDB; scrapes collector `:8889`; evaluates alert rules |
+| `alertmanager` | 9098 | Routes firing **metric-based** Prometheus alerts to email (SMTP via workload `.env`) |
 | `tempo` | 3200 | Trace storage |
 | `grafana` | 3000 | Dashboards (Prometheus + Tempo datasources, SLO Overview) |
 | `opensearch` | 9200 | Log storage (`otel-logs*` index) |
@@ -35,6 +36,7 @@ Mounted from the repository root (relative to `platform/docker-compose.yml`):
 |------|---------|
 | [otel-collector-config.yaml](../otel-collector-config.yaml) | `otel-collector` |
 | [prometheus/prometheus.yml](../prometheus/prometheus.yml) | `prometheus` |
+| [prometheus/alertmanager.yml.template](../prometheus/alertmanager.yml.template) | `alertmanager` (rendered at startup) |
 | [tempo/tempo.yaml](../tempo/tempo.yaml) | `tempo` |
 | [grafana/](../grafana/) | `grafana` (provisioning) |
 | [postgres/init.sql](../postgres/init.sql) | `postgres` (schema) |

@@ -33,6 +33,27 @@ class RulesFileManagerTest {
     }
 
     @Test
+    void publishesAndArchivesAlertPolicyRulesFile() throws Exception {
+        Path generated = tempDir.resolve("alert-generated.yml");
+        Files.writeString(generated, "groups: []\n");
+
+        rulesFileManager.publishAlertPolicyRules("payment-approval-security-alert", generated);
+
+        Path active = rulesFileManager.alertPolicyRulesPath("payment-approval-security-alert");
+        assertThat(Files.exists(active)).isTrue();
+
+        rulesFileManager.archiveAlertPolicyRules("payment-approval-security-alert");
+
+        assertThat(Files.exists(active)).isFalse();
+        assertThat(Files.exists(tempDir.resolve("_archive/alert-payment-approval-security-alert.yml"))).isTrue();
+    }
+
+    @Test
+    void archiveAlertPolicyRulesNoOpWhenActiveFileMissing() throws Exception {
+        rulesFileManager.archiveAlertPolicyRules("missing-policy");
+    }
+
+    @Test
     void publishesAndArchivesRulesFile() throws Exception {
         Path generated = tempDir.resolve("generated.yml");
         Files.writeString(generated, "groups: []\n");

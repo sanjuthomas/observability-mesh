@@ -38,22 +38,15 @@ spec:
   SLI: `apiVersion: openslo/v1
 kind: SLI
 metadata:
-  name: my-service-availability-sli
-  displayName: Availability SLI
+  name: payment-approval-security-sli
+  displayName: Payment approval security events
 spec:
-  description: Ratio of successful HTTP requests
-  ratioMetric:
-    counter: true
-    good:
-      metricSource:
-        type: Prometheus
-        spec:
-          query: sum(rate(http_requests_total{status=~"2.."}[5m]))
-    total:
-      metricSource:
-        type: Prometheus
-        spec:
-          query: sum(rate(http_requests_total[5m]))
+  description: Count of payment APPROVE attempts denied with ALERT severity
+  thresholdMetric:
+    metricSource:
+      metricSourceRef: payment-prometheus
+      spec:
+        query: sum(increase(payment_security_events_total{action="APPROVE",severity="ALERT"}[5m]))
 `,
 
   Service: `apiVersion: openslo/v1
@@ -80,42 +73,45 @@ spec:
   AlertPolicy: `apiVersion: openslo/v1
 kind: AlertPolicy
 metadata:
-  name: availability-burn-rate
-  displayName: Availability burn rate alert
+  name: payment-approval-security-alert
+  displayName: Payment approval security ALERT
 spec:
-  description: Alert when error budget burn rate is high
+  description: Email when a payment APPROVE attempt is denied with ALERT severity
   alertWhenBreaching: true
   alertWhenResolved: true
   alertWhenNoData: false
   conditions:
-    - conditionRef: high-burn-rate
+    - conditionRef: payment-approval-security-condition
   notificationTargets:
-    - targetRef: on-call-email
+    - targetRef: observability-mesh-email
 `,
 
   AlertCondition: `apiVersion: openslo/v1
 kind: AlertCondition
 metadata:
-  name: high-burn-rate
-  displayName: High burn rate
+  name: payment-approval-security-condition
+  displayName: Payment approval security ALERT
+  annotations:
+    observability-mesh.alert-type: metric-threshold
+    observability-mesh.sli-ref: payment-approval-security-sli
 spec:
-  description: Burn rate exceeds threshold
+  description: Fire when any payment APPROVE attempt is denied with ALERT severity
   severity: page
   condition:
     kind: burnrate
-    op: gte
-    threshold: 2
-    lookbackWindow: 1h
-    alertAfter: 5m
+    op: gt
+    threshold: 0
+    lookbackWindow: 5m
+    alertAfter: 0m
 `,
 
   AlertNotificationTarget: `apiVersion: openslo/v1
 kind: AlertNotificationTarget
 metadata:
-  name: on-call-email
-  displayName: On-call email
+  name: observability-mesh-email
+  displayName: Observability Mesh email
 spec:
-  description: Email notification for on-call
+  description: Tenant email route via Alertmanager (observabilitymesh@sanju.org in demo)
   target: email
 `
 };

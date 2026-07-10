@@ -15,6 +15,7 @@ import com.observabilitymesh.payment.ofac.OfacScanRequest;
 import com.observabilitymesh.payment.ofac.OfacScanRequestFactory;
 import com.observabilitymesh.payment.ofac.OfacScanRequestRepository;
 import com.observabilitymesh.payment.metrics.PaymentLifecycleMetrics;
+import com.observabilitymesh.payment.metrics.PaymentSecurityEventMetrics;
 import com.observabilitymesh.payment.model.LifecycleEvent;
 import com.observabilitymesh.payment.model.Payment;
 import com.observabilitymesh.payment.model.PaymentAction;
@@ -61,6 +62,7 @@ public class PaymentService {
     private final PaymentProperties properties;
     private final ObjectMapper objectMapper;
     private final PaymentLifecycleMetrics lifecycleMetrics;
+    private final PaymentSecurityEventMetrics securityEventMetrics;
 
     public PaymentService(
             PaymentRepository repository,
@@ -72,7 +74,8 @@ public class PaymentService {
             ServiceIdentity serviceIdentity,
             PaymentProperties properties,
             ObjectMapper objectMapper,
-            PaymentLifecycleMetrics lifecycleMetrics) {
+            PaymentLifecycleMetrics lifecycleMetrics,
+            PaymentSecurityEventMetrics securityEventMetrics) {
         this.repository = repository;
         this.securityEventRepository = securityEventRepository;
         this.ofacScanRequestRepository = ofacScanRequestRepository;
@@ -83,6 +86,7 @@ public class PaymentService {
         this.properties = properties;
         this.objectMapper = objectMapper;
         this.lifecycleMetrics = lifecycleMetrics;
+        this.securityEventMetrics = securityEventMetrics;
     }
 
     public VersionedPayment create(
@@ -510,6 +514,7 @@ public class PaymentService {
         String eventId = securityEventRepository.allocateEventId(payment.paymentId());
         PaymentSecurityEvent event = PaymentSecurityEvent.policyDenial(
                 action, subject, payment, reason, details, null);
+        securityEventMetrics.recordPolicyAlert(action, event.severity());
         securityEventRepository.insert(event, eventId);
     }
 

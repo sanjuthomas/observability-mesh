@@ -33,6 +33,26 @@ services:
     networks:
       - observability-mesh-net
 
+  alertmanager:
+    build:
+      context: ..
+      dockerfile: prometheus/Dockerfile.alertmanager
+    ports:
+      - "${ALERTMANAGER_PORT:-9098}:9093"
+    environment:
+      ALERTMANAGER_SMTP_HOST: ${ALERTMANAGER_SMTP_HOST:-}
+      ALERTMANAGER_SMTP_PORT: ${ALERTMANAGER_SMTP_PORT:-587}
+      ALERTMANAGER_SMTP_FROM: ${ALERTMANAGER_SMTP_FROM:-alerts@observability-mesh.local}
+      ALERTMANAGER_SMTP_USER: ${ALERTMANAGER_SMTP_USER:-}
+      ALERTMANAGER_SMTP_PASSWORD: ${ALERTMANAGER_SMTP_PASSWORD:-}
+      ALERTMANAGER_SMTP_REQUIRE_TLS: ${ALERTMANAGER_SMTP_REQUIRE_TLS:-true}
+      ALERTMANAGER_EMAIL_TO: ${ALERTMANAGER_EMAIL_TO:-observabilitymesh@sanju.org}
+    volumes:
+      - alertmanager-data:/alertmanager
+    restart: unless-stopped
+    networks:
+      - observability-mesh-net
+
   prometheus:
     image: prom/prometheus:v2.55.1
     command:
@@ -46,6 +66,8 @@ services:
       - prometheus-sloth-rules:/etc/prometheus/rules-sloth
       - prometheus-data:/prometheus
     depends_on:
+      alertmanager:
+        condition: service_started
       otel-collector:
         condition: service_started
     healthcheck:
@@ -227,5 +249,6 @@ volumes:
   opensearch-data:
   prometheus-data:
   prometheus-sloth-rules:
+  alertmanager-data:
   tempo-data:
   grafana-data:
