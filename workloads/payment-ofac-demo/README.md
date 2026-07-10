@@ -56,6 +56,27 @@ Docker Compose sets `OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318` and
 
 This workload overrides platform SLO services to enable Keycloak JWT auth and seeds OpenSLO documents via `postgres/seed-slos.sql`. The provisioner datasource allowlist is `payment-prometheus` (set in `docker-compose.yml`).
 
+**Metric-based alerts from this workload**
+
+```mermaid
+flowchart LR
+    subgraph SLOpath[SLO catalog — authored alerts]
+        SloAuth[slo-author-service]
+        Prov[slo-provisioner + Sloth + metric alerts]
+        SloAuth -->|OpenSLO SLO, SLI, AlertPolicy| Prov
+        Prov -->|burn-rate + alert-*.yml rules| Prom[Prometheus]
+    end
+    Pay[payment-service] -->|payment_security_events_total| OTel[otel-collector]
+    OTel --> Prom
+    Prom --> AM[Alertmanager]
+    AM --> Email[observabilitymesh@sanju.org]
+    Pay -.->|audit only| Mongo[(MongoDB security_events)]
+```
+
+SLO breach and payment-approval security alerts both follow the catalog path above. Author `AlertPolicy`, `AlertCondition`, and a `thresholdMetric` `SLI` in slo-author; the provisioner compiles metric-threshold policies to `alert-{policyName}.yml`.
+
+`payment_security_events_total` drives that security email; MongoDB security events power the browser UI only.
+
 ### Explore in Grafana
 
 Open http://localhost:3000 (`admin` / `admin`). Generic Grafana navigation is in the root [README](../../README.md#explore-in-grafana).
@@ -83,6 +104,15 @@ Wait ~60–90 seconds after payment approvals so OFAC scans finish and `sanction
 **Metrics** (optional) — **Explore** → **Prometheus**: `rate(http_server_requests_seconds_count{service_name="instruction-service"}[5m])`
 
 **Logs** — OpenSearch Dashboards http://localhost:5601 (index pattern `otel-logs*`)
+
+**Email alerts (metric-based)** — configure SMTP in `.env` (see `.env.example`). Alerts email **`observabilitymesh@sanju.org`** when Prometheus rules fire on OTLP metrics:
+
+- **SLO breach** — OpenSLO `SLO` + `SLI` in slo-author → Sloth burn-rate alert rules (`sloth_severity=ticket` or `page`)
+- **Payment approval security ALERT** — OpenSLO `AlertPolicy` + `AlertCondition` + `SLI` (`thresholdMetric` on `payment_security_events_total`) in slo-author → provisioner `alert-payment-approval-security-alert.yml`
+
+MongoDB `security_events` documents power the browser UI; the email alert uses the Prometheus counter, not a log or DB query.
+
+Trigger a payment approval alert with the harness payment policy scenario: `./scripts/seed-demo-data.sh --seed-only` (includes `run-payment-policy-scenario`). Alertmanager UI: http://localhost:9098.
 
 `demo-harness` is not on the shared telemetry module yet.
 
@@ -210,8 +240,18 @@ Platform libraries for SLO services (`shared/observability-mesh-auth`, `common`,
 
 ## Reset
 
+OpenSLO catalog documents (2 SLIs + 2 SLOs + payment security alert bundle) live in `postgres/seed-slos.sql` and load automatically on **first** Postgres init when the data volume is created.
+
 ```bash
 docker compose down -v --remove-orphans
 docker compose up -d --build
 ./scripts/seed-demo-data.sh --seed-only
+```
+
+After `down -v`, Postgres initdb runs `01-init.sql` (schema) then `02-seed-slos.sql` (catalog). Wait ~60s for `slo-provisioner-service` to publish Sloth and alert rules.
+
+If you rebuilt without `-v` and need to re-apply catalog rows (idempotent):
+
+```bash
+./scripts/apply-open-slo-seed.sh
 ```
