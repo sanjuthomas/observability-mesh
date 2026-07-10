@@ -57,4 +57,13 @@ To seed documents on first Postgres init, the **consuming** compose (not this im
 
 ## Publish
 
-Pushes to `main` (and version tags) build and publish the image via `.github/workflows/publish-slo-catalog.yml` to GHCR.
+Pushes to `main` (and version tags) build and publish the image to **Docker Hub** via `.github/workflows/publish-slo-catalog.yml`.
+
+Required GitHub Actions secrets (repo → Settings → Secrets and variables → Actions):
+
+| Secret | Value |
+|--------|--------|
+| `DOCKERHUB_USERNAME` | Docker Hub username (e.g. `sanjuthomas`) |
+| `DOCKERHUB_TOKEN` | Docker Hub [Access Token](https://hub.docker.com/settings/security) with read/write |
+
+Image: [`sanjuthomas/observability-mesh-slo-catalog`](https://hub.docker.com/r/sanjuthomas/observability-mesh-slo-catalog)

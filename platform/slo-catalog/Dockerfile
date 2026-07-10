@@ -2,7 +2,7 @@
 # PostgreSQL (open_slo) + slo-author-service + slo-provisioner-service (+ Sloth).
 #
 # Build from repo root:
-#   docker build -f platform/slo-catalog/Dockerfile -t ghcr.io/sanjuthomas/observability-mesh-slo-catalog:0.1.0 .
+#   docker build -f platform/slo-catalog/Dockerfile -t sanjuthomas/observability-mesh-slo-catalog:0.1.0 .
 
 FROM maven:3.9-eclipse-temurin-21-alpine AS build
 WORKDIR /src

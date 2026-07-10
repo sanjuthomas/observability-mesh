@@ -28,7 +28,7 @@ Each workload compose project gets its **own** collector, Prometheus, Tempo, Gra
 
 For demos and external workloads, the three catalog processes are also published as one image:
 
-- Image: `ghcr.io/sanjuthomas/observability-mesh-slo-catalog`
+- Image: `sanjuthomas/observability-mesh-slo-catalog`
 - Docs: [platform/slo-catalog/README.md](slo-catalog/README.md)
 - Ships **schema only** — OpenSLO documents (SLO / SLI / Alert*) come from the consuming workload
 
