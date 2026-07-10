@@ -6,18 +6,18 @@ Policy-aware SSI cash instruction and payment lifecycle demo (trimmed port of [p
 
 ```mermaid
 flowchart LR
-    User[Browser / Harness] --> Keycloak[Keycloak OIDC]
-    User --> Inst[instruction-service]
-    User --> Pay[payment-service]
-    User --> Ofac[ofac-service]
-    Inst --> Authz[authorization-service]
+    User["Browser and Harness"] --> Keycloak["Keycloak OIDC"]
+    User --> Inst["instruction-service"]
+    User --> Pay["payment-service"]
+    User --> Ofac["ofac-service"]
+    Inst --> Authz["authorization-service"]
     Pay --> Authz
-    Authz --> OPA[OPA]
-    Inst --> Mongo[(MongoDB)]
+    Authz --> OPA["OPA"]
+    Inst --> Mongo[("MongoDB")]
     Pay --> Mongo
-    Pay -.->|scan-requests| OfacDb[(ofac DB)]
+    Pay -.->|scan requests| OfacDb[("ofac DB")]
     Ofac --> OfacDb
-    Seq[sequence-service] --> Mongo
+    Seq["sequence-service"] --> Mongo
     Inst --> Seq
     Pay --> Seq
 ```
@@ -60,17 +60,17 @@ This workload overrides platform SLO services to enable Keycloak JWT auth and se
 
 ```mermaid
 flowchart LR
-    subgraph SLOpath[SLO catalog — authored alerts]
-        SloAuth[slo-author-service]
-        Prov[slo-provisioner + Sloth + metric alerts]
+    subgraph SLOpath["SLO catalog - authored alerts"]
+        SloAuth["slo-author-service"]
+        Prov["slo-provisioner, Sloth, metric alerts"]
         SloAuth -->|OpenSLO SLO, SLI, AlertPolicy| Prov
-        Prov -->|burn-rate + alert-*.yml rules| Prom[Prometheus]
+        Prov -->|burn-rate and alert rules| Prom["Prometheus"]
     end
-    Pay[payment-service] -->|payment_security_events_total| OTel[otel-collector]
+    Pay["payment-service"] -->|payment_security_events_total| OTel["otel-collector"]
     OTel --> Prom
-    Prom --> AM[Alertmanager]
-    AM --> Email[observabilitymesh@sanju.org]
-    Pay -.->|audit only| Mongo[(MongoDB security_events)]
+    Prom --> AM["Alertmanager"]
+    AM --> Email["observabilitymesh@sanju.org"]
+    Pay -.->|audit only| Mongo[("MongoDB security_events")]
 ```
 
 SLO breach and payment-approval security alerts both follow the catalog path above. Author `AlertPolicy`, `AlertCondition`, and a `thresholdMetric` `SLI` in slo-author; the provisioner compiles metric-threshold policies to `alert-{policyName}.yml`.

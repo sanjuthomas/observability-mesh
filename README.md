@@ -28,30 +28,30 @@ Each workload composes the platform mesh alongside its application services. Tel
 
 ```mermaid
 flowchart LR
-    subgraph Apps[Application services]
+    subgraph Apps["Application services"]
         direction TB
-        App1[your-service-a]
-        App2[your-service-b]
+        App1["your-service-a"]
+        App2["your-service-b"]
     end
-    Apps -->|OTLP metrics| OTel[otel-collector]
-    OTel -->|logs| OS[OpenSearch]
-    OTel -->|metrics| Prom[Prometheus]
-    OTel -->|traces| Tempo[Tempo]
-    Prom --> Grafana[Grafana]
+    App1 -->|OTLP metrics| OTel["otel-collector"]
+    App2 -->|OTLP metrics| OTel
+    OTel -->|logs| OS["OpenSearch"]
+    OTel -->|metrics| Prom["Prometheus"]
+    OTel -->|traces| Tempo["Tempo"]
+    Prom --> Grafana["Grafana"]
     Tempo --> Grafana
-    OS --> OSD[OpenSearch Dashboards]
-    Prom -->|PromQL alert rules fire| AM[Alertmanager]
-    AM -->|email| Notify[observabilitymesh@sanju.org]
+    OS --> OSD["OpenSearch Dashboards"]
+    Prom -->|PromQL alert rules| AM["Alertmanager"]
+    AM -->|email| Notify["observabilitymesh@sanju.org"]
 
-    subgraph SLO[SLO catalog]
-        SloAuth[slo-author-service]
-        Prov[slo-provisioner-service]
-        PG[(PostgreSQL open_slo)]
+    subgraph SLO["SLO catalog"]
+        SloAuth["slo-author-service"]
+        Prov["slo-provisioner-service"]
+        PG[("PostgreSQL open_slo")]
     end
     SloAuth --> PG
     PG --> Prov
-    Prov -->|Sloth recording + alert rules| Prom
-    StaticSec[static security PromQL rule — demo only] --> Prom
+    Prov -->|Sloth and OpenSLO alert rules| Prom
 ```
 
 See [workloads/payment-ofac-demo/README.md](workloads/payment-ofac-demo/README.md) for a full end-to-end demo (SSI payments, OFAC scans, Keycloak, OPA, MongoDB).
@@ -64,15 +64,15 @@ Instrumented services export logs, metrics, and traces over OTLP to the tenant c
 
 ```mermaid
 flowchart LR
-    Apps[Instrumented services] -->|OTLP :4317 / :4318| OTel[otel-collector]
-    OTel -->|logs pipeline| OS[OpenSearch]
-    OTel -->|metrics pipeline| Prom[Prometheus :8889]
-    OTel -->|traces pipeline| Tempo[Tempo]
-    Prom --> Grafana[Grafana]
+    Apps["Instrumented services"] -->|OTLP 4317 and 4318| OTel["otel-collector"]
+    OTel -->|logs pipeline| OS["OpenSearch"]
+    OTel -->|metrics pipeline| Prom["Prometheus 8889"]
+    OTel -->|traces pipeline| Tempo["Tempo"]
+    Prom --> Grafana["Grafana"]
     Tempo --> Grafana
-    OS --> OSD[OpenSearch Dashboards]
-    Prom -->|evaluate alert rules| AM[Alertmanager]
-    AM -->|SMTP email| Notify[observabilitymesh@sanju.org]
+    OS --> OSD["OpenSearch Dashboards"]
+    Prom -->|evaluate alert rules| AM["Alertmanager"]
+    AM -->|SMTP email| Notify["observabilitymesh@sanju.org"]
 ```
 
 ### Signal flow
@@ -98,36 +98,36 @@ Configuration: [otel-collector-config.yaml](otel-collector-config.yaml), [promet
 
 ```mermaid
 flowchart LR
-    subgraph Authoring[Authoring]
+    subgraph Authoring["Authoring"]
         direction TB
-        SloAuth[SLO authoring service]
-        Postgres[(PostgreSQL open_slo)]
+        SloAuth["SLO authoring service"]
+        Postgres[("PostgreSQL open_slo")]
     end
 
-    subgraph Provisioning[Provisioning]
+    subgraph Provisioning["Provisioning"]
         direction TB
-        Prov[slo-provisioner-service]
-        Sloth[Sloth CLI]
+        Prov["slo-provisioner-service"]
+        Sloth["Sloth CLI"]
     end
 
-    subgraph Metrics[Prometheus, Grafana & Alertmanager]
+    subgraph Metrics["Prometheus, Grafana and Alertmanager"]
         direction TB
-        Grafana[Grafana + SLO Overview dashboard]
-        Prom[Prometheus]
-        AM[Alertmanager]
-        Rules[(tenant Sloth + alert rules volume)]
+        Grafana["Grafana SLO Overview dashboard"]
+        Prom["Prometheus"]
+        AM["Alertmanager"]
+        Rules[("Sloth and alert rules volume")]
     end
 
     SloAuth --> Postgres
-    Postgres -->|poll stale=false SLO, SLI, AlertPolicy| Prov
-    Prov -->|OpenSLO v1 → v1alpha YAML| Sloth
-    Sloth -->|recording + burn-rate alert rules| Rules
-    Prov -->|metric-threshold AlertPolicy → alert-*.yml| Rules
+    Postgres -->|poll active SLO, SLI, AlertPolicy| Prov
+    Prov -->|OpenSLO v1 to v1alpha YAML| Sloth
+    Sloth -->|recording and burn-rate alert rules| Rules
+    Prov -->|metric-threshold AlertPolicy rules| Rules
     Rules --> Prom
-    Prov -->|POST /-/reload| Prom
+    Prov -->|POST reload| Prom
     Prom -->|ALERTS metric| Grafana
     Prom -->|firing alerts| AM
-    AM -->|email| Notify[observabilitymesh@sanju.org]
+    AM -->|email| Notify["observabilitymesh@sanju.org"]
 ```
 
 1. Read active `kind=SLO` rows from `service_level_objectives`; resolve `spec.indicatorRef` to the active `kind=SLI` document.
@@ -210,17 +210,17 @@ Alerts are driven by **Prometheus metrics and PromQL rules** — not OpenSearch 
 
 ```mermaid
 flowchart LR
-    App[App OTLP counter] --> OTel[otel-collector]
-    OTel --> Prom[Prometheus]
-    subgraph Catalog[SLO catalog workflow]
-        SloAuth[slo-author-service]
-        Prov[slo-provisioner + Sloth + metric alerts]
+    App["App OTLP counter"] --> OTel["otel-collector"]
+    OTel --> Prom["Prometheus"]
+    subgraph Catalog["SLO catalog workflow"]
+        SloAuth["slo-author-service"]
+        Prov["slo-provisioner, Sloth, metric alerts"]
         SloAuth --> Prov
-        Prov -->|burn-rate + alert-*.yml rules| Prom
+        Prov -->|burn-rate and alert rules| Prom
     end
-    Prom -->|rule fires| AM[Alertmanager]
-    AM -->|SMTP| Email[observabilitymesh@sanju.org]
-    Prom -->|ALERTS time series| Grafana[Grafana SLO dashboard]
+    Prom -->|rule fires| AM["Alertmanager"]
+    AM -->|SMTP| Email["observabilitymesh@sanju.org"]
+    Prom -->|ALERTS time series| Grafana["Grafana SLO dashboard"]
 ```
 
 Prometheus routes firing alerts to **Alertmanager** (http://localhost:9098 by default), which emails **`observabilitymesh@sanju.org`** when SMTP is configured.
