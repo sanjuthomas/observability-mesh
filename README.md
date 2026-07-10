@@ -1,10 +1,10 @@
 # Observability Mesh
 
-Reference stack for **observability sovereignty without enterprise licensing** — a composable **observability mesh** with logs, metrics, traces, OpenSLO authoring, and the backends to explore SLIs and SLO dashboards.
+**Observability Mesh** is a lightweight, vendor-free operating model for decentralized observability ownership. The core principle is simple: observability is part of the application — owned and operated by the team that ships it — not shared infrastructure that every service feeds into.
 
-Application teams run **isolated tenants**: each workload `include`s a shared platform bundle (collector, Prometheus, Tempo, Grafana, OpenSearch, PostgreSQL SLO catalog, SLO author, SLO provisioner) and adds its own services, identity, and data stores. The root `docker-compose.yml` is a convenience shim for the default demo workload ([payment-ofac-demo](workloads/payment-ofac-demo/README.md)).
+This repository is a working reference for that model. It includes a composable open-source stack (logs, metrics, traces, SLO authoring) and a demo workload you can replace with your own services. Platform teams publish building blocks; application teams compose an isolated tenant alongside their app and own day-2 operations within that boundary.
 
-OpenSLO documents are authored in `slo-author-service` (Spring Boot service and browser UI). `slo-provisioner-service` compiles active SLOs through [Sloth](https://github.com/slok/sloth) into Prometheus recording rules; Grafana loads the **SLO Overview (Sloth)** dashboard automatically under **SLOs**. The provisioner also exposes a read-only browser UI for provision status and generated rules.
+The default demo is [payment-ofac-demo](workloads/payment-ofac-demo/README.md). The root `docker-compose.yml` is a convenience shim to start it from the repo root.
 
 ## Why I built this
 
