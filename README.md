@@ -143,13 +143,13 @@ flowchart LR
 3. Run `sloth generate` and write `{sloName}.yml` under the tenant's Prometheus rules directory; archive removed SLOs to `_archive/` (orphan policy: drop rules, mark `ARCHIVED` in `slo_provision_state` — Grafana objects are not deleted).
 4. `POST` Prometheus `/-/reload` when rules change.
 
-**SLO provisioner browser** — http://localhost:9097/ui/ is a read-only admin UI with tabs for **SLO provisions** and **SLI definitions**. It lists active documents from PostgreSQL together with provision status (`ACTIVE`, `FAILED`, `ARCHIVED`, `NOT_PROVISIONED`); open a row for indicator PromQL, generated Prometheus recording rules YAML, and the source OpenSLO JSON. Platform services run **without authentication** for now (`observability-mesh.auth.enabled=false` in compose); workload demo UIs still use Keycloak.
+**SLO provisioner browser** — http://localhost:9097/ui/ is a read-only admin UI (Keycloak JWT, `PLATFORM_ADMIN` role) with tabs for **SLO provisions** and **SLI definitions**. It lists active documents from PostgreSQL together with provision status (`ACTIVE`, `FAILED`, `ARCHIVED`, `NOT_PROVISIONED`); open a row for indicator PromQL, generated Prometheus recording rules YAML, and the source OpenSLO JSON. Sign in with **`admin-001`** / **`Password1!`**.
 
 Datasource allowlist is configured in `application.properties` (`observability-mesh.slo-provisioner.datasource-names=payment-prometheus`). Emit matching metrics from the demo workload to evaluate SLOs in Grafana.
 
 ### OpenSLO authoring
 
-`slo-author-service` (port 9090) is where developers author, validate, and version OpenSLO v1 documents through a browser UI and REST API. Documents are validated with the [open-slo-java-sdk](https://github.com/sanjuthomas/open-slo-java-sdk) and stored in **PostgreSQL** (`open_slo` database, `service_level_objectives` table with JSONB `content`). Platform services run **without authentication** for now; open http://localhost:9090/ui/ directly. `slo-provisioner-service` then reads those active SLOs and translates them into Prometheus rules via Sloth.
+`slo-author-service` (port 9090) is where developers author, validate, and version OpenSLO v1 documents through a browser UI and REST API. Documents are validated with the [open-slo-java-sdk](https://github.com/sanjuthomas/open-slo-java-sdk) and stored in **PostgreSQL** (`open_slo` database, `service_level_objectives` table with JSONB `content`). It authenticates against the workload Keycloak realm — sign in at http://localhost:9090/ui/ with **`admin-001`** / **`Password1!`**; the `/api/v1/documents/**` API is JWT-protected. `slo-provisioner-service` then reads those active SLOs and translates them into Prometheus rules via Sloth.
 
 ## Sanction scanning (OFAC)
 
@@ -234,7 +234,7 @@ If another Docker stack already uses names like `mongodb`, `postgres`, or `opens
 
 ## Service URLs
 
-Demo Keycloak users (instruction, payment, OFAC, authorization, and harness UIs) share password **`Password1!`** — any `user_id` from [keycloak-seed/users.yaml](workloads/payment-ofac-demo/oidc/keycloak-seed/users.yaml) works. Platform operator default: **`admin-001`**. SLO author (:9090) and provisioner (:9097) browsers do **not** require sign-in in the current demo.
+Demo Keycloak users (instruction, payment, OFAC, SLO author, SLO provisioner, authorization, and harness UIs) share password **`Password1!`** — any `user_id` from [keycloak-seed/users.yaml](workloads/payment-ofac-demo/oidc/keycloak-seed/users.yaml) works. Platform operator default: **`admin-001`**.
 
 | URL | Service | Username | Password |
 |-----|---------|----------|----------|
@@ -243,8 +243,8 @@ Demo Keycloak users (instruction, payment, OFAC, authorization, and harness UIs)
 | http://localhost:9096/ui/ | OFAC scan browser | `admin-001` | `Password1!` |
 | http://localhost:9094/ui/ | Authorization user directory | `admin-001` | `Password1!` |
 | http://localhost:9091 | Demo harness | `admin-001` | `Password1!` |
-| http://localhost:9090/ui/ | SLO authoring service | — | — |
-| http://localhost:9097/ui/ | SLO provisioner browser | — | — |
+| http://localhost:9090/ui/ | SLO authoring service | `admin-001` | `Password1!` |
+| http://localhost:9097/ui/ | SLO provisioner browser | `admin-001` | `Password1!` |
 | http://localhost:9080 | Keycloak admin console | `admin` | `admin` |
 | http://localhost:3000 | Grafana — metrics & traces | `admin` | `admin` |
 | http://localhost:9092 | Prometheus UI | — | — |
@@ -280,6 +280,7 @@ Point a locally running service at the collector with `OTEL_EXPORTER_OTLP_ENDPOI
 │   └── docker-compose.yml           # observability mesh (otel, prometheus, grafana, SLO services, …)
 ├── shared/                          # Platform libraries (auth, common, telemetry)
 ├── workloads/
+│   ├── _template/                   # copy to create isolated parallel demos
 │   └── payment-ofac-demo/           # SSI instruction/payment/OFAC demo workload
 │       ├── shared/                  # payment-ofac-common, payment-ofac-auth, payment-ofac-telemetry, …
 │       ├── authorization-service/

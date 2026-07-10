@@ -13,7 +13,7 @@ Policy-aware SSI cash instruction and payment lifecycle demo (trimmed port of [p
 | `sequence-service` | 9095 | ID sequences |
 | `demo-harness` | 9091 | Demo actions and seeding |
 
-Also includes **MongoDB**, **OPA**, **opa-policy-seed**, and **Keycloak** (`oidc/`) used only by this workload. Platform mesh services (SLO author/provisioner, Grafana, etc.) run without authentication for now.
+Also includes **MongoDB**, **OPA**, **opa-policy-seed**, and **Keycloak** (`oidc/`) used only by this workload. Starting this workload also starts the shared observability platform via `include: ../../platform/docker-compose.yml`. Copy `.env.example` → `.env` to pin ports; defaults match `PORT_BLOCK=0`. See `workloads/_template/README.md` for running multiple isolated tenants in parallel.
 
 ## Commands
 

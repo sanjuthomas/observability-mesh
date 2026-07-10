@@ -1,3 +1,7 @@
+# Shared observability mesh platform bundle.
+# Host ports are parameterized via the workload .env (see workloads/_template/.env.example).
+# Do not set container_name here — compose project name scopes containers and volumes per workload.
+
 x-otel-environment: &otel-environment
   OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
   OTEL_EXPORTER_OTLP_METRICS_URL: http://otel-collector:4318/v1/metrics
@@ -13,14 +17,13 @@ x-otel-environment: &otel-environment
 services:
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.96.0
-    container_name: otel-collector
     command: ["--config=/etc/otel-collector-config.yaml"]
     volumes:
       - ../otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
     ports:
-      - "4317:4317"
-      - "4318:4318"
-      - "8889:8889"
+      - "${OTEL_GRPC_PORT:-4317}:4317"
+      - "${OTEL_HTTP_PORT:-4318}:4318"
+      - "${OTEL_METRICS_PORT:-8889}:8889"
     depends_on:
       opensearch:
         condition: service_healthy
@@ -32,13 +35,12 @@ services:
 
   prometheus:
     image: prom/prometheus:v2.55.1
-    container_name: prometheus
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
       - --web.enable-lifecycle
     ports:
-      - "9092:9090"
+      - "${PROMETHEUS_PORT:-9092}:9090"
     volumes:
       - ../prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-sloth-rules:/etc/prometheus/rules-sloth
@@ -58,13 +60,12 @@ services:
 
   tempo:
     image: grafana/tempo:2.6.1
-    container_name: tempo
     command: ["-config.file=/etc/tempo/tempo.yaml"]
     volumes:
       - ../tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
       - tempo-data:/var/tempo
     ports:
-      - "3200:3200"
+      - "${TEMPO_PORT:-3200}:3200"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3200/ready"]
       interval: 10s
@@ -77,9 +78,8 @@ services:
 
   grafana:
     image: grafana/grafana:11.4.0
-    container_name: grafana
     ports:
-      - "3000:3000"
+      - "${GRAFANA_PORT:-3000}:3000"
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
@@ -105,7 +105,6 @@ services:
 
   opensearch:
     image: opensearchproject/opensearch:2.11.1
-    container_name: opensearch
     environment:
       cluster.name: observability-mesh
       node.name: opensearch
@@ -118,7 +117,7 @@ services:
         soft: -1
         hard: -1
     ports:
-      - "9200:9200"
+      - "${OPENSEARCH_PORT:-9200}:9200"
     volumes:
       - opensearch-data:/usr/share/opensearch/data
     healthcheck:
@@ -137,12 +136,11 @@ services:
 
   opensearch-dashboards:
     image: opensearchproject/opensearch-dashboards:2.11.1
-    container_name: opensearch-dashboards
     environment:
       OPENSEARCH_HOSTS: '["http://opensearch:9200"]'
       DISABLE_SECURITY_DASHBOARDS_PLUGIN: "true"
     ports:
-      - "5601:5601"
+      - "${OPENSEARCH_DASHBOARDS_PORT:-5601}:5601"
     depends_on:
       opensearch:
         condition: service_healthy
@@ -152,13 +150,12 @@ services:
 
   postgres:
     image: postgres:16-alpine
-    container_name: postgres
     environment:
       POSTGRES_DB: open_slo
       POSTGRES_USER: open_slo
       POSTGRES_PASSWORD: open_slo
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ../postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
@@ -176,9 +173,8 @@ services:
     build:
       context: ..
       dockerfile: slo-author-service/Dockerfile
-    container_name: slo-author-service
     ports:
-      - "9090:9090"
+      - "${SLO_AUTHOR_PORT:-9090}:9090"
     environment:
       <<: *otel-environment
       OBSERVABILITY_MESH_AUTH_ENABLED: "false"
@@ -197,9 +193,8 @@ services:
     build:
       context: ..
       dockerfile: slo-provisioner-service/Dockerfile
-    container_name: slo-provisioner-service
     ports:
-      - "9097:9097"
+      - "${SLO_PROVISIONER_PORT:-9097}:9097"
     environment:
       <<: *otel-environment
       OBSERVABILITY_MESH_AUTH_ENABLED: "false"
@@ -226,7 +221,6 @@ services:
 
 networks:
   observability-mesh-net:
-    name: observability-mesh-net
 
 volumes:
   postgres-data:

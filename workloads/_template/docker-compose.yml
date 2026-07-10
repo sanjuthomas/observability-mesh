@@ -1,0 +1,100 @@
+# Rename directory and compose project before use.
+name: my-workload
+
+include:
+  - path: ../../platform/docker-compose.yml
+
+x-otel-environment: &otel-environment
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+  OTEL_EXPORTER_OTLP_METRICS_URL: http://otel-collector:4318/v1/metrics
+  OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+  OTEL_EXPORTER_OTLP_INSECURE: "true"
+  OTEL_METRIC_EXPORT_STEP: 15s
+  OTEL_LOG_CONSOLE: "true"
+  OTEL_DEPLOYMENT_ENVIRONMENT: development
+  OTEL_METRIC_EXPORT_INTERVAL: "15000"
+  OTEL_INSTRUMENTATION_MONGO_ENABLED: "false"
+  OTEL_INSTRUMENTATION_SPRING_WEB_ENABLED: "false"
+
+x-keycloak-environment: &keycloak-environment
+  OIDC_ISSUER_URL: http://localhost:${KEYCLOAK_PORT:-9080}/realms/observability-mesh
+  OIDC_JWK_SET_URI: http://keycloak:9080/realms/observability-mesh/protocol/openid-connect/certs
+  KEYCLOAK_TOKEN_URL: http://keycloak:9080/realms/observability-mesh/protocol/openid-connect/token
+  KEYCLOAK_CLIENT_ID: observability-mesh-ui
+  KEYCLOAK_CLIENT_SECRET: ""
+
+services:
+  # --- Platform overrides (optional) ---
+  slo-author-service:
+    environment:
+      <<: *keycloak-environment
+      OBSERVABILITY_MESH_AUTH_ENABLED: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak-seed:
+        condition: service_completed_successfully
+
+  slo-provisioner-service:
+    environment:
+      <<: *keycloak-environment
+      OBSERVABILITY_MESH_AUTH_ENABLED: "true"
+      OBSERVABILITY_MESH_SLO_PROVISIONER_DATASOURCE_NAMES: ${SLO_PROVISIONER_DATASOURCE_NAMES:-my-workload-prometheus}
+
+  postgres:
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ../../postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./postgres/seed-slos.sql:/docker-entrypoint-initdb.d/02-seed-slos.sql:ro
+
+  # --- Workload identity (Keycloak) ---
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0.7
+    command: start-dev --import-realm
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HTTP_PORT: 9080
+      KC_HOSTNAME: localhost
+      KC_HOSTNAME_PORT: ${KEYCLOAK_PORT:-9080}
+      KC_HOSTNAME_STRICT: "false"
+      KC_HOSTNAME_STRICT_HTTPS: "false"
+      KC_HTTP_ENABLED: "true"
+    volumes:
+      - ./oidc/keycloak-seed/realm-observability-mesh.json:/opt/keycloak/data/import/realm-observability-mesh.json:ro
+    ports:
+      - "${KEYCLOAK_PORT:-9080}:9080"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "exec 3<>/dev/tcp/127.0.0.1/9080; echo -e 'GET /realms/observability-mesh/.well-known/openid-configuration HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3; cat <&3 | grep -q 200",
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 18
+      start_period: 40s
+    restart: unless-stopped
+    networks:
+      - observability-mesh-net
+
+  keycloak-seed:
+    build: ./oidc/keycloak-seed
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    environment:
+      KEYCLOAK_URL: http://keycloak:9080
+      KEYCLOAK_REALM: observability-mesh
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    restart: "no"
+    networks:
+      - observability-mesh-net
+
+  # --- Add workload app services below (MongoDB, OPA, microservices, …) ---
+  # Copy patterns from workloads/payment-ofac-demo/docker-compose.yml.
+  # Use ${MONGODB_PORT:-27017}:27017 style host ports from .env.
+
+volumes:
+  mongo-data:

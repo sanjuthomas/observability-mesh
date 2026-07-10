@@ -16,15 +16,27 @@ x-otel-environment: &otel-environment
   OTEL_INSTRUMENTATION_SPRING_WEB_ENABLED: "false"
 
 x-keycloak-environment: &keycloak-environment
-  OIDC_ISSUER_URL: http://localhost:9080/realms/observability-mesh
+  OIDC_ISSUER_URL: http://localhost:${KEYCLOAK_PORT:-9080}/realms/observability-mesh
   OIDC_JWK_SET_URI: http://keycloak:9080/realms/observability-mesh/protocol/openid-connect/certs
   KEYCLOAK_TOKEN_URL: http://keycloak:9080/realms/observability-mesh/protocol/openid-connect/token
   KEYCLOAK_CLIENT_ID: observability-mesh-ui
   KEYCLOAK_CLIENT_SECRET: ""
 
 services:
+  slo-author-service:
+    environment:
+      <<: *keycloak-environment
+      OBSERVABILITY_MESH_AUTH_ENABLED: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak-seed:
+        condition: service_completed_successfully
+
   slo-provisioner-service:
     environment:
+      <<: *keycloak-environment
+      OBSERVABILITY_MESH_AUTH_ENABLED: "true"
       OBSERVABILITY_MESH_SLO_PROVISIONER_DATASOURCE_NAMES: payment-prometheus
 
   postgres:
@@ -35,21 +47,20 @@ services:
 
   keycloak:
     image: quay.io/keycloak/keycloak:26.0.7
-    container_name: keycloak
     command: start-dev --import-realm
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin
       KC_HTTP_PORT: 9080
       KC_HOSTNAME: localhost
-      KC_HOSTNAME_PORT: 9080
+      KC_HOSTNAME_PORT: ${KEYCLOAK_PORT:-9080}
       KC_HOSTNAME_STRICT: "false"
       KC_HOSTNAME_STRICT_HTTPS: "false"
       KC_HTTP_ENABLED: "true"
     volumes:
       - ./oidc/keycloak-seed/realm-observability-mesh.json:/opt/keycloak/data/import/realm-observability-mesh.json:ro
     ports:
-      - "9080:9080"
+      - "${KEYCLOAK_PORT:-9080}:9080"
     healthcheck:
       test:
         [
@@ -66,7 +77,6 @@ services:
 
   keycloak-seed:
     build: ./oidc/keycloak-seed
-    container_name: keycloak-seed
     depends_on:
       keycloak:
         condition: service_healthy
@@ -81,9 +91,8 @@ services:
 
   opa:
     image: openpolicyagent/opa:1.17.1
-    container_name: opa-server
     ports:
-      - "9181:9181"
+      - "${OPA_PORT:-9181}:9181"
     command:
       - run
       - --server
@@ -100,7 +109,6 @@ services:
 
   opa-policy-seed:
     build: ./opa-policy-seed
-    container_name: opa-policy-seed
     depends_on:
       - opa
     environment:
@@ -114,10 +122,9 @@ services:
 
   mongodb:
     image: mongo:7
-    container_name: mongodb
     command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
     ports:
-      - "27017:27017"
+      - "${MONGODB_PORT:-27017}:27017"
     volumes:
       - mongo-data:/data/db
     restart: unless-stopped
@@ -132,7 +139,6 @@ services:
 
   mongo-init:
     image: mongo:7
-    container_name: mongo-init
     depends_on:
       mongodb:
         condition: service_healthy
@@ -159,9 +165,8 @@ services:
     build:
       context: ../..
       dockerfile: workloads/payment-ofac-demo/sequence-service/Dockerfile
-    container_name: sequence-service
     ports:
-      - "9095:9095"
+      - "${SEQUENCE_PORT:-9095}:9095"
     environment:
       <<: *otel-environment
       OTEL_SERVICE_NAME: sequence-service
@@ -180,9 +185,8 @@ services:
     build:
       context: ../..
       dockerfile: workloads/payment-ofac-demo/authorization-service/Dockerfile
-    container_name: authorization-service
     ports:
-      - "9094:9094"
+      - "${AUTHORIZATION_PORT:-9094}:9094"
     environment:
       <<: [*otel-environment, *keycloak-environment]
       OTEL_SERVICE_NAME: authorization-service
@@ -203,9 +207,8 @@ services:
     build:
       context: ../..
       dockerfile: workloads/payment-ofac-demo/instruction-service/Dockerfile
-    container_name: instruction-service
     ports:
-      - "9000:9000"
+      - "${INSTRUCTION_PORT:-9000}:9000"
     environment:
       <<: [*otel-environment, *keycloak-environment]
       OTEL_SERVICE_NAME: instruction-service
@@ -236,9 +239,8 @@ services:
     build:
       context: ../..
       dockerfile: workloads/payment-ofac-demo/payment-service/Dockerfile
-    container_name: payment-service
     ports:
-      - "9093:9093"
+      - "${PAYMENT_PORT:-9093}:9093"
     environment:
       <<: [*otel-environment, *keycloak-environment]
       OTEL_SERVICE_NAME: payment-service
@@ -273,9 +275,8 @@ services:
     build:
       context: ../..
       dockerfile: workloads/payment-ofac-demo/ofac-service/Dockerfile
-    container_name: ofac-service
     ports:
-      - "9096:9096"
+      - "${OFAC_PORT:-9096}:9096"
     environment:
       <<: [*otel-environment, *keycloak-environment]
       OTEL_SERVICE_NAME: ofac-service
@@ -296,9 +297,8 @@ services:
     build:
       context: ../..
       dockerfile: workloads/payment-ofac-demo/demo-harness/Dockerfile
-    container_name: demo-harness
     ports:
-      - "9091:9091"
+      - "${DEMO_HARNESS_PORT:-9091}:9091"
     environment:
       <<: *keycloak-environment
       INSTRUCTION_SERVICE_URL: http://instruction-service:9000
@@ -320,7 +320,3 @@ services:
 
 volumes:
   mongo-data:
-
-networks:
-  observability-mesh-net:
-    name: observability-mesh-net
