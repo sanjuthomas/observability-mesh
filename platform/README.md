@@ -30,6 +30,7 @@ For demos and external workloads, the three catalog processes are also published
 
 - Image: `ghcr.io/sanjuthomas/observability-mesh-slo-catalog`
 - Docs: [platform/slo-catalog/README.md](slo-catalog/README.md)
+- Ships **schema only** — OpenSLO documents (SLO / SLI / Alert*) come from the consuming workload
 
 Upstream collector / Prometheus / Grafana remain separate compose services.
 

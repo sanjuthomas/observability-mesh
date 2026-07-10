@@ -1,6 +1,9 @@
 # Example: run the packed SLO catalog image next to Prometheus.
 # From repo root (after building the image):
 #   docker compose -f platform/slo-catalog/docker-compose.example.yml up -d
+#
+# The catalog starts empty (schema only). Mount OpenSLO seed SQL from the
+# consuming workload (e.g. petstore demo) if you want documents on first init.
 
 name: slo-catalog-example
 
@@ -20,8 +23,6 @@ services:
     volumes:
       - slo-catalog-pg:/var/lib/postgresql/data
       - prometheus-sloth-rules:/rules
-      # Optional workload seed (runs only on first Postgres init):
-      # - ../../workloads/_template/postgres/seed-slos.sql:/docker-entrypoint-initdb.d/02-seed-slos.sql:ro
     networks:
       - mesh
 

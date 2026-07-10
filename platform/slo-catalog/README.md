@@ -4,9 +4,11 @@ Single image that packs what this repo **builds** for the OpenSLO path:
 
 | Process | Port | Role |
 |---------|------|------|
-| PostgreSQL (`open_slo`) | 5432 | Catalog store |
+| PostgreSQL (`open_slo`) | 5432 | Catalog store (schema only) |
 | `slo-author-service` | 9090 | Author / validate / version OpenSLO docs |
 | `slo-provisioner-service` | 9097 | Sloth → Prometheus rules (+ metric alert policies) |
+
+**No OpenSLO documents are baked into the image** — no SLOs, SLIs, or Alert policies. The database starts with an empty catalog schema (`postgres/init.sql`). Workloads (e.g. a future Petstore demo) supply their own seeds or author documents via the UI/API.
 
 Upstream mesh pieces (collector, Prometheus, Grafana, …) stay separate images and compose with this bundle.
 
@@ -42,7 +44,8 @@ Then open:
 |-------|---------|
 | `/var/lib/postgresql/data` | Catalog persistence |
 | `/rules` | Shared with Prometheus (`rule_files` → `rules-sloth`) |
-| `/docker-entrypoint-initdb.d/02-*.sql` | Optional OpenSLO seed (first init only) |
+
+To seed documents on first Postgres init, the **consuming** compose (not this image) can mount SQL into `/docker-entrypoint-initdb.d/` (e.g. `02-seed-slos.sql` from a Petstore repo).
 
 ## Important env
 
