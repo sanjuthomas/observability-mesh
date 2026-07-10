@@ -24,6 +24,15 @@ Each workload compose project gets its **own** collector, Prometheus, Tempo, Gra
 | `slo-author-service` | 9090 | OpenSLO authoring UI + API |
 | `slo-provisioner-service` | 9097 | Sloth batch + provisioner browser UI |
 
+## Packaged image (author + provisioner + Postgres)
+
+For demos and external workloads, the three catalog processes are also published as one image:
+
+- Image: `ghcr.io/sanjuthomas/observability-mesh-slo-catalog`
+- Docs: [platform/slo-catalog/README.md](slo-catalog/README.md)
+
+Upstream collector / Prometheus / Grafana remain separate compose services.
+
 Host ports are set in the **workload** `.env` file (see [workloads/_template/.env.example](../workloads/_template/.env.example)). Formula: `host_port = base_port + PORT_BLOCK`.
 
 Do **not** set `container_name` on services — compose project name scopes containers and volumes per workload.

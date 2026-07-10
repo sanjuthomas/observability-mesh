@@ -1,0 +1,48 @@
+# Example: run the packed SLO catalog image next to Prometheus.
+# From repo root (after building the image):
+#   docker compose -f platform/slo-catalog/docker-compose.example.yml up -d
+
+name: slo-catalog-example
+
+services:
+  slo-catalog:
+    image: ghcr.io/sanjuthomas/observability-mesh-slo-catalog:0.1.0
+    build:
+      context: ../..
+      dockerfile: platform/slo-catalog/Dockerfile
+    ports:
+      - "5432:5432"
+      - "9090:9090"
+      - "9097:9097"
+    environment:
+      OBSERVABILITY_MESH_SLO_PROVISIONER_DATASOURCE_NAMES: prometheus
+      PROMETHEUS_RELOAD_URL: http://prometheus:9090/-/reload
+    volumes:
+      - slo-catalog-pg:/var/lib/postgresql/data
+      - prometheus-sloth-rules:/rules
+      # Optional workload seed (runs only on first Postgres init):
+      # - ../../workloads/_template/postgres/seed-slos.sql:/docker-entrypoint-initdb.d/02-seed-slos.sql:ro
+    networks:
+      - mesh
+
+  # Minimal Prometheus so the provisioner can reload rules (not a full mesh).
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-lifecycle
+    ports:
+      - "9092:9090"
+    volumes:
+      - ../../prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-sloth-rules:/etc/prometheus/rules-sloth
+    networks:
+      - mesh
+
+networks:
+  mesh:
+
+volumes:
+  slo-catalog-pg:
+  prometheus-sloth-rules:
