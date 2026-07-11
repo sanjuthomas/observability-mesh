@@ -1,10 +1,16 @@
 # Observability Mesh SLO catalog bundle:
 # PostgreSQL (open_slo) + slo-author-service + slo-provisioner-service (+ Sloth).
 #
+# Multi-arch (linux/amd64, linux/arm64). JARs are built on the builder platform;
+# the runtime stage is produced per target architecture.
+#
 # Build from repo root:
-#   docker build -f platform/slo-catalog/Dockerfile -t sanjuthomas/observability-mesh-slo-catalog:0.1.0 .
+#   docker buildx build --platform linux/amd64,linux/arm64 \
+#     -f platform/slo-catalog/Dockerfile \
+#     -t sanjuthomas/observability-mesh-slo-catalog:0.1.0 .
 
-FROM maven:3.9-eclipse-temurin-21-alpine AS build
+# Always compile on the native builder CPU (JARs are architecture-independent).
+FROM --platform=$BUILDPLATFORM maven:3.9-eclipse-temurin-21-alpine AS build
 WORKDIR /src
 COPY . .
 RUN chmod +x mvnw \
@@ -13,13 +19,14 @@ RUN chmod +x mvnw \
 FROM postgres:16-alpine
 
 ARG SLOTH_VERSION=v0.16.0
-ARG TARGETARCH=amd64
+ARG TARGETARCH
 
 RUN apk add --no-cache openjdk21-jre-headless curl \
-    && ARCH="${TARGETARCH}" \
-    && if [ "${ARCH}" = "amd64" ]; then SLOTH_ARCH=amd64; \
-       elif [ "${ARCH}" = "arm64" ]; then SLOTH_ARCH=arm64; \
-       else SLOTH_ARCH=amd64; fi \
+    && case "${TARGETARCH}" in \
+         amd64) SLOTH_ARCH=amd64 ;; \
+         arm64) SLOTH_ARCH=arm64 ;; \
+         *) echo "unsupported TARGETARCH=${TARGETARCH}" >&2; exit 1 ;; \
+       esac \
     && curl -fsSL "https://github.com/slok/sloth/releases/download/${SLOTH_VERSION}/sloth-linux-${SLOTH_ARCH}" \
         -o /usr/local/bin/sloth \
     && chmod +x /usr/local/bin/sloth

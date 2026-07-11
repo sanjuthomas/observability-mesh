@@ -15,15 +15,31 @@ Upstream mesh pieces (collector, Prometheus, Grafana, …) stay separate images 
 ## Image
 
 ```text
-ghcr.io/sanjuthomas/observability-mesh-slo-catalog:<tag>
+sanjuthomas/observability-mesh-slo-catalog:<tag>
 ```
+
+Published as a **multi-arch** manifest for:
+
+| Platform | Typical hosts |
+|----------|----------------|
+| `linux/amd64` | Intel/AMD PCs and servers |
+| `linux/arm64` | Apple Silicon Macs, AWS Graviton, Raspberry Pi 4/5 (64-bit) |
+
+`docker pull` selects the matching architecture automatically. (Windows containers are not supported — this stack is Linux-only.)
 
 ## Build locally
 
 From the **repository root**:
 
 ```bash
-docker build -f platform/slo-catalog/Dockerfile -t ghcr.io/sanjuthomas/observability-mesh-slo-catalog:0.1.0 .
+# Current machine only
+docker build -f platform/slo-catalog/Dockerfile -t sanjuthomas/observability-mesh-slo-catalog:0.1.0 .
+
+# Multi-arch (requires buildx + QEMU); --push materializes both platforms on the registry
+docker buildx build --platform linux/amd64,linux/arm64 \
+  -f platform/slo-catalog/Dockerfile \
+  -t sanjuthomas/observability-mesh-slo-catalog:0.1.0 \
+  --push .
 ```
 
 ## Run (with Prometheus for rule reload)
